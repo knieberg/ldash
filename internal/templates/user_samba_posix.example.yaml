@@ -1,0 +1,28 @@
+# User creation template — copy to ~/.config/ldash/templates/user_samba_posix.yaml
+name: samba_posix_user
+description: POSIX + inetOrgPerson + sambaSamAccount user entry
+
+object_classes:
+  - inetOrgPerson
+  - posixAccount
+  - sambaSamAccount
+
+defaults:
+  login_shell: "/bin/bash"
+  home_prefix: "/home"
+
+required_attributes:
+  - uid
+  - cn
+  - sn
+  - uidNumber
+  - gidNumber
+  - homeDirectory
+  - loginShell
+
+optional_attributes:
+  - givenName
+  - mail
+  - gecos
+
+create_primary_group: true

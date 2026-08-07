@@ -1,0 +1,27 @@
+# Example only — copy to ~/.config/ldash/config.yaml and customize.
+# Run: ldash config init
+
+server:
+  url: "ldap://ldap.example.com:389"
+  tls_mode: starttls # plain | starttls | ldaps
+
+base_dn: "dc=example,dc=com"
+bind_dn: "cn=admin,dc=example,dc=com"
+
+organizational_units:
+  people: "ou=People"
+  groups: "ou=Groups"
+
+id_ranges:
+  uid_start: 10000
+  gid_start: 10000
+
+search:
+  user_filter: "(&(objectClass=inetOrgPerson)(uid=%s))"
+  group_filter: "(objectClass=posixGroup)"
+  list_users_filter: "(objectClass=inetOrgPerson)"
+
+templates_dir: "~/.config/ldash/templates"
+
+# Credentials: use ~/.config/ldash/credentials (mode 0600) or prompt on start.
+# credential_file: "~/.config/ldash/credentials"
