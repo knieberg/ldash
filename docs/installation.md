@@ -5,7 +5,7 @@
 - Linux, macOS, or other Unix-like system with a terminal
 - OpenLDAP or compatible LDAP server
 - LDAP administrative bind DN
-- Go 1.24+ (when building from source)
+- Go 1.24+ (CI uses Go 1.25.12 via `toolchain` in `go.mod`)
 
 ## Build from source (recommended until releases are published)
 

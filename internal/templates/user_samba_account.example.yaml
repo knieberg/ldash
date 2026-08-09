@@ -1,0 +1,31 @@
+# Alternative Samba-oriented template example.
+# Copy to ~/.config/ldash/templates/user_samba_posix.yaml (or point templates_dir
+# at a custom file) when existing users use account/posixAccount/sambaSamAccount
+# without inetOrgPerson. Inspect live schema with:
+#   ldapsearch -b "ou=People,dc=example,dc=com" "(uid=*)" uid objectClass
+name: samba_account_user
+description: account + posixAccount + sambaSamAccount (common Samba LDAP layout)
+
+object_classes:
+  - account
+  - posixAccount
+  - sambaSamAccount
+
+defaults:
+  login_shell: "/bin/bash"
+  home_prefix: "/home"
+
+required_attributes:
+  - uid
+  - cn
+  - uidNumber
+  - gidNumber
+  - homeDirectory
+  - loginShell
+
+optional_attributes:
+  - description
+  - mail
+  - gecos
+
+create_primary_group: true

@@ -1,6 +1,8 @@
 # User creation template — copy to ~/.config/ldash/templates/user_samba_posix.yaml
+# Adjust object_classes to match your directory. Many Samba trees use account
+# instead of (or in addition to) inetOrgPerson — see user_samba_account.example.yaml.
 name: samba_posix_user
-description: POSIX + inetOrgPerson + sambaSamAccount user entry
+description: POSIX + inetOrgPerson + sambaSamAccount user entry (example)
 
 object_classes:
   - inetOrgPerson

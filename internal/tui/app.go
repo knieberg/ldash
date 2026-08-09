@@ -501,7 +501,9 @@ func (m model) viewUsers() string {
 		b.WriteString("\n\n")
 	}
 	if len(m.users) == 0 {
-		b.WriteString(mutedStyle.Render("No users loaded. Press r to refresh."))
+		b.WriteString(mutedStyle.Render("No users found. Press r to refresh."))
+		b.WriteString("\n")
+		b.WriteString(warnStyle.Render("Check search.list_users_filter — does it match your LDAP object classes?"))
 		return b.String()
 	}
 	b.WriteString(headerStyle.Render(fmt.Sprintf("%-16s %-24s %-8s %s", "UID", "CN", "UID#", "MAIL")))
@@ -532,13 +534,13 @@ func (m model) viewIntegration() string {
 	}, "\n")))
 	b.WriteString("\n\n")
 	if m.integ.SelfServiceURL != "" {
-		b.WriteString(fmt.Sprintf("Self-service URL: %s\n", m.integ.SelfServiceURL))
+		fmt.Fprintf(&b, "Self-service URL: %s\n", m.integ.SelfServiceURL)
 	}
 	if m.integ.OIDCIssuer != "" {
-		b.WriteString(fmt.Sprintf("OIDC issuer: %s\n", m.integ.OIDCIssuer))
+		fmt.Fprintf(&b, "OIDC issuer: %s\n", m.integ.OIDCIssuer)
 	}
 	if m.integ.OIDCProvider != "" {
-		b.WriteString(fmt.Sprintf("OIDC provider: %s\n", m.integ.OIDCProvider))
+		fmt.Fprintf(&b, "OIDC provider: %s\n", m.integ.OIDCProvider)
 	}
 	if len(m.integ.OnboardingChecklist) > 0 {
 		b.WriteString("\nOnboarding checklist:\n")
@@ -554,7 +556,7 @@ func (m model) viewIntegration() string {
 
 func (m model) viewSettings() string {
 	return boxStyle.Render(strings.Join([]string{
-		fmt.Sprintf("Config profile: single file (MVP)"),
+		"Config profile: single file (MVP)",
 		fmt.Sprintf("Server: %s", m.cfg.Server.URL),
 		fmt.Sprintf("TLS mode: %s", m.cfg.Server.TLSMode),
 		fmt.Sprintf("Bind DN: %s", m.cfg.BindDN),
@@ -579,7 +581,7 @@ func (m model) viewForm() string {
 		if i == m.formFocus {
 			prefix = "▸ "
 		}
-		b.WriteString(fmt.Sprintf("%s%-14s %s\n", prefix, labels[i]+":", in.View()))
+		fmt.Fprintf(&b, "%s%-14s %s\n", prefix, labels[i]+":", in.View())
 	}
 	if m.current == viewUserPassword && m.integ.SelfServiceURL != "" {
 		b.WriteString("\n")
@@ -597,7 +599,7 @@ func (m model) viewDelete() string {
 	if len(m.groups) > 0 {
 		b.WriteString("Referenced by groups:\n")
 		for _, g := range m.groups {
-			b.WriteString(fmt.Sprintf("  - %s (%s)\n", g.CN, g.Attr))
+			fmt.Fprintf(&b, "  - %s (%s)\n", g.CN, g.Attr)
 		}
 		b.WriteString("\n")
 	} else {

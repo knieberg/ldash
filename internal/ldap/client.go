@@ -3,6 +3,7 @@ package ldap
 import (
 	"crypto/tls"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -31,27 +32,30 @@ func NewClient(cfg *config.Config) *Client {
 }
 
 func (c *Client) Connect(bindPassword string) error {
-	url := c.cfg.Server.URL
-	var conn *ldap.Conn
-	var err error
+	rawURL := c.cfg.Server.URL
+	tlsCfg, err := tlsConfigFromServerURL(rawURL)
+	if err != nil {
+		return fmt.Errorf("connect: %w", err)
+	}
 
+	var conn *ldap.Conn
 	switch strings.ToLower(c.cfg.Server.TLSMode) {
 	case "ldaps":
-		conn, err = ldap.DialURL(normalizeLDAPS(url))
+		conn, err = ldap.DialURL(normalizeLDAPS(rawURL), ldap.DialWithTLSConfig(tlsCfg))
 	case "starttls":
-		conn, err = ldap.DialURL(normalizeLDAP(url))
+		conn, err = ldap.DialURL(normalizeLDAP(rawURL))
 		if err == nil {
-			err = conn.StartTLS(&tls.Config{MinVersion: tls.VersionTLS12})
+			err = conn.StartTLS(tlsCfg)
 		}
 	default:
-		conn, err = ldap.DialURL(normalizeLDAP(url))
+		conn, err = ldap.DialURL(normalizeLDAP(rawURL))
 	}
 	if err != nil {
 		return fmt.Errorf("connect: %w", err)
 	}
 
 	if err := conn.Bind(c.cfg.BindDN, bindPassword); err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return fmt.Errorf("bind: %w", err)
 	}
 
@@ -60,9 +64,35 @@ func (c *Client) Connect(bindPassword string) error {
 	return nil
 }
 
+// hostnameFromServerURL extracts the TLS ServerName hostname from a server URL.
+func hostnameFromServerURL(rawURL string) (string, error) {
+	normalized := normalizeLDAP(rawURL)
+	u, err := url.Parse(normalized)
+	if err != nil {
+		return "", fmt.Errorf("parse server url: %w", err)
+	}
+	host := u.Hostname()
+	if host == "" {
+		return "", fmt.Errorf("server url has no hostname: %q", rawURL)
+	}
+	return host, nil
+}
+
+// tlsConfigFromServerURL builds a verified TLS config (TLS 1.2+, ServerName, no skip-verify).
+func tlsConfigFromServerURL(rawURL string) (*tls.Config, error) {
+	serverName, err := hostnameFromServerURL(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	return &tls.Config{
+		ServerName: serverName,
+		MinVersion: tls.VersionTLS12,
+	}, nil
+}
+
 func (c *Client) Close() {
 	if c.conn != nil {
-		c.conn.Close()
+		_ = c.conn.Close()
 		c.conn = nil
 		c.bound = false
 	}

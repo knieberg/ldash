@@ -40,7 +40,7 @@ ldash is a terminal user interface (TUI) for managing users, groups, passwords, 
 
 ### Requirements
 
-- Go 1.24+ (to build from source)
+- Go 1.24+ (toolchain 1.25.12 recommended for builds matching CI)
 - OpenLDAP or compatible LDAP server
 - LDAP bind DN with administrative write access
 

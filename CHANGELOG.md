@@ -15,10 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Samba SID generation from `samba.domain_sid` and uidNumber
 - Integration guide panel driven by local runtime config
 - Module path and GitHub references: `knieberg/ldash`
+- CI jobs: test, lint, vuln (`govulncheck`), hygiene; local `make ci` parity
 
 ### Changed
 
 - Stronger `.gitignore` for editor/AI metadata; lean contribution checklist
+- Default user search filters cover `inetOrgPerson` **or** `posixAccount` (Samba-friendly)
+- Docs: schema matching, `ldapsearch` objectClass diagnosis, alternate Samba account template example
+
+### Security
+
+- TLS certificate verification for StartTLS and LDAPS (hostname from server URL)
+- Password changes via Password Modify extended operation only (no plaintext `userPassword` writes)
+- Credential file: trim whitespace, reject empty, expect mode `0600`
+- Validate `search.user_filter` has exactly one `%s`; roll back CreateUser entry if password set fails
 
 ## [0.0.1] — scaffold
 
