@@ -599,7 +599,7 @@ func (m model) viewDelete() string {
 	if len(m.groups) > 0 {
 		b.WriteString("Referenced by groups:\n")
 		for _, g := range m.groups {
-			b.WriteString(fmt.Sprintf("  - %s (%s)\n", g.CN, g.Attr))
+			fmt.Fprintf(&b, "  - %s (%s)\n", g.CN, g.Attr)
 		}
 		b.WriteString("\n")
 	} else {
