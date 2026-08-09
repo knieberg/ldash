@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Samba SID generation from `samba.domain_sid` and uidNumber
 - Integration guide panel driven by local runtime config
 - Module path and GitHub references: `knieberg/ldash`
-- CI jobs: test, lint, vuln, hygiene, dependency-review; local `make ci` parity
+- CI jobs: test, lint, vuln (`govulncheck`), hygiene; local `make ci` parity
 
 ### Changed
 

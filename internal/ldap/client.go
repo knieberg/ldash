@@ -55,7 +55,7 @@ func (c *Client) Connect(bindPassword string) error {
 	}
 
 	if err := conn.Bind(c.cfg.BindDN, bindPassword); err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return fmt.Errorf("bind: %w", err)
 	}
 
@@ -92,7 +92,7 @@ func tlsConfigFromServerURL(rawURL string) (*tls.Config, error) {
 
 func (c *Client) Close() {
 	if c.conn != nil {
-		c.conn.Close()
+		_ = c.conn.Close()
 		c.conn = nil
 		c.bound = false
 	}

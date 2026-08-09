@@ -556,7 +556,7 @@ func (m model) viewIntegration() string {
 
 func (m model) viewSettings() string {
 	return boxStyle.Render(strings.Join([]string{
-		fmt.Sprintf("Config profile: single file (MVP)"),
+		"Config profile: single file (MVP)",
 		fmt.Sprintf("Server: %s", m.cfg.Server.URL),
 		fmt.Sprintf("TLS mode: %s", m.cfg.Server.TLSMode),
 		fmt.Sprintf("Bind DN: %s", m.cfg.BindDN),
