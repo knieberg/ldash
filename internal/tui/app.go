@@ -534,13 +534,13 @@ func (m model) viewIntegration() string {
 	}, "\n")))
 	b.WriteString("\n\n")
 	if m.integ.SelfServiceURL != "" {
-		b.WriteString(fmt.Sprintf("Self-service URL: %s\n", m.integ.SelfServiceURL))
+		fmt.Fprintf(&b, "Self-service URL: %s\n", m.integ.SelfServiceURL)
 	}
 	if m.integ.OIDCIssuer != "" {
-		b.WriteString(fmt.Sprintf("OIDC issuer: %s\n", m.integ.OIDCIssuer))
+		fmt.Fprintf(&b, "OIDC issuer: %s\n", m.integ.OIDCIssuer)
 	}
 	if m.integ.OIDCProvider != "" {
-		b.WriteString(fmt.Sprintf("OIDC provider: %s\n", m.integ.OIDCProvider))
+		fmt.Fprintf(&b, "OIDC provider: %s\n", m.integ.OIDCProvider)
 	}
 	if len(m.integ.OnboardingChecklist) > 0 {
 		b.WriteString("\nOnboarding checklist:\n")
@@ -581,7 +581,7 @@ func (m model) viewForm() string {
 		if i == m.formFocus {
 			prefix = "▸ "
 		}
-		b.WriteString(fmt.Sprintf("%s%-14s %s\n", prefix, labels[i]+":", in.View()))
+		fmt.Fprintf(&b, "%s%-14s %s\n", prefix, labels[i]+":", in.View())
 	}
 	if m.current == viewUserPassword && m.integ.SelfServiceURL != "" {
 		b.WriteString("\n")
