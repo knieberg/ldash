@@ -116,11 +116,10 @@ func readBindPassword(cfg *config.Config) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if data, err := os.ReadFile(credPath); err == nil {
-		if err := config.CheckPermissions(credPath, 0o600); err != nil {
-			return "", err
-		}
-		return string(data), nil
+	if _, err := os.Stat(credPath); err == nil {
+		return config.ReadBindPasswordFile(credPath)
+	} else if !os.IsNotExist(err) {
+		return "", err
 	}
 
 	fmt.Fprintf(os.Stderr, "LDAP bind password for %s: ", cfg.BindDN)

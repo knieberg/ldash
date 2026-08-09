@@ -71,9 +71,10 @@ func (c *Client) GetUser(uid string) (*User, error) {
 	if err := c.requireBound(); err != nil {
 		return nil, err
 	}
-	filter := fmt.Sprintf(c.cfg.Search.UserFilter, ldap.EscapeFilter(uid))
-	if !strings.Contains(c.cfg.Search.UserFilter, "%s") {
-		filter = fmt.Sprintf("(&(objectClass=inetOrgPerson)(uid=%s))", ldap.EscapeFilter(uid))
+	esc := ldap.EscapeFilter(uid)
+	filter := strings.Replace(c.cfg.Search.UserFilter, "%s", esc, 1)
+	if strings.Count(c.cfg.Search.UserFilter, "%s") != 1 {
+		filter = "(&(|(objectClass=inetOrgPerson)(objectClass=posixAccount))(uid=" + esc + "))"
 	}
 	req := ldap.NewSearchRequest(
 		c.cfg.PeopleDN(),
@@ -159,8 +160,11 @@ func (c *Client) CreateUser(in CreateUserInput) error {
 	if in.Template == nil {
 		return fmt.Errorf("user template is required")
 	}
-	if in.UID == "" || in.CN == "" || in.SN == "" {
-		return fmt.Errorf("uid, cn, and sn are required")
+	if in.UID == "" || in.CN == "" {
+		return fmt.Errorf("uid and cn are required")
+	}
+	if templateNeedsSN(in.Template) && in.SN == "" {
+		return fmt.Errorf("sn is required for this user template")
 	}
 	if in.UIDNumber == 0 {
 		n, err := c.NextUIDNumber()
@@ -205,8 +209,9 @@ func (c *Client) CreateUser(in CreateUserInput) error {
 		sambaSID = sid
 	}
 
+	groupDN := fmt.Sprintf("cn=%s,%s", ldap.EscapeDN(in.UID), c.cfg.GroupsDN())
+	createdGroup := false
 	if in.Template.CreatePrimaryGroup {
-		groupDN := fmt.Sprintf("cn=%s,%s", ldap.EscapeDN(in.UID), c.cfg.GroupsDN())
 		g := ldap.NewAddRequest(groupDN, nil)
 		g.Attribute("objectClass", []string{"top", "posixGroup"})
 		g.Attribute("cn", []string{in.UID})
@@ -216,6 +221,8 @@ func (c *Client) CreateUser(in CreateUserInput) error {
 			if !ldap.IsErrorWithCode(err, ldap.LDAPResultEntryAlreadyExists) {
 				return fmt.Errorf("create primary group: %w", err)
 			}
+		} else {
+			createdGroup = true
 		}
 	}
 
@@ -225,7 +232,9 @@ func (c *Client) CreateUser(in CreateUserInput) error {
 	req.Attribute("objectClass", classes)
 	req.Attribute("uid", []string{in.UID})
 	req.Attribute("cn", []string{in.CN})
-	req.Attribute("sn", []string{in.SN})
+	if in.SN != "" {
+		req.Attribute("sn", []string{in.SN})
+	}
 	req.Attribute("uidNumber", []string{strconv.Itoa(in.UIDNumber)})
 	req.Attribute("gidNumber", []string{strconv.Itoa(in.GIDNumber)})
 	req.Attribute("homeDirectory", []string{in.HomeDirectory})
@@ -242,14 +251,40 @@ func (c *Client) CreateUser(in CreateUserInput) error {
 		req.Attribute("sambaAcctFlags", []string{"[U          ]"})
 	}
 	if err := c.conn.Add(req); err != nil {
+		if createdGroup {
+			_ = c.conn.Del(ldap.NewDelRequest(groupDN, nil))
+		}
 		return fmt.Errorf("create user: %w", err)
 	}
 	if in.Password != "" {
 		if err := c.SetPassword(dn, in.Password); err != nil {
+			if delErr := c.conn.Del(ldap.NewDelRequest(dn, nil)); delErr != nil {
+				return fmt.Errorf("set password: %w; rollback delete user: %v", err, delErr)
+			}
+			if createdGroup {
+				if delErr := c.conn.Del(ldap.NewDelRequest(groupDN, nil)); delErr != nil {
+					return fmt.Errorf("set password: %w; rollback delete group: %v", err, delErr)
+				}
+			}
 			return fmt.Errorf("set password: %w", err)
 		}
 	}
 	return nil
+}
+
+func templateNeedsSN(tpl *config.UserTemplate) bool {
+	for _, oc := range tpl.ObjectClasses {
+		switch strings.ToLower(oc) {
+		case "inetorgperson", "person", "organizationalperson":
+			return true
+		}
+	}
+	for _, attr := range tpl.RequiredAttributes {
+		if strings.EqualFold(attr, "sn") {
+			return true
+		}
+	}
+	return false
 }
 
 // UpdateUserInput holds editable user attributes.
@@ -320,18 +355,14 @@ func (c *Client) SetMail(dn, mail string) error {
 	return nil
 }
 
-// SetPassword changes userPassword via Password Modify extended op when possible.
+// SetPassword changes the password via the Password Modify extended operation only.
 func (c *Client) SetPassword(dn, newPassword string) error {
 	if err := c.requireBound(); err != nil {
 		return err
 	}
 	passReq := ldap.NewPasswordModifyRequest(dn, "", newPassword)
 	if _, err := c.conn.PasswordModify(passReq); err != nil {
-		mod := ldap.NewModifyRequest(dn, nil)
-		mod.Replace("userPassword", []string{newPassword})
-		if err2 := c.conn.Modify(mod); err2 != nil {
-			return fmt.Errorf("password modify: %v; fallback: %w", err, err2)
-		}
+		return fmt.Errorf("password modify: %w (server must support Password Modify extended operation)", err)
 	}
 	return nil
 }

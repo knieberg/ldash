@@ -18,13 +18,12 @@ ldash does not install or configure overlays; it detects and reports when possib
 
 ## User template
 
-The example template `user_samba_posix.example.yaml` includes:
+The example templates include:
 
-- `inetOrgPerson`
-- `posixAccount`
-- `sambaSamAccount`
+- `user_samba_posix.example.yaml` — `inetOrgPerson`, `posixAccount`, `sambaSamAccount`
+- `user_samba_account.example.yaml` — `account`, `posixAccount`, `sambaSamAccount`
 
-Adjust object classes in your local template under `~/.config/ldash/templates/` to match your schema.
+Adjust object classes in your local template under `~/.config/ldash/templates/` to match entries already in the directory (see `docs/configuration.md`).
 
 ## Standalone vs domain controller
 

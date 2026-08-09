@@ -14,6 +14,11 @@ const (
 	AppName    = "ldash"
 	ConfigDir  = ".config/ldash"
 	ConfigFile = "config.yaml"
+
+	// DefaultListUsersFilter matches inetOrgPerson and/or posixAccount (typical POSIX/Samba).
+	DefaultListUsersFilter = "(|(objectClass=inetOrgPerson)(objectClass=posixAccount))"
+	// DefaultUserFilter looks up a single uid under the same objectClass union.
+	DefaultUserFilter = "(&(|(objectClass=inetOrgPerson)(objectClass=posixAccount))(uid=%s))"
 )
 
 // Config holds LDAP connection and directory layout settings.
@@ -135,7 +140,13 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("server.tls_mode must be plain, starttls, or ldaps")
 	}
 	if c.Search.ListUsersFilter == "" {
-		c.Search.ListUsersFilter = "(objectClass=inetOrgPerson)"
+		c.Search.ListUsersFilter = DefaultListUsersFilter
+	}
+	if c.Search.UserFilter == "" {
+		c.Search.UserFilter = DefaultUserFilter
+	}
+	if strings.Count(c.Search.UserFilter, "%s") != 1 {
+		return fmt.Errorf("search.user_filter must contain exactly one %%s placeholder")
 	}
 	if c.IDRanges.UIDStart == 0 {
 		c.IDRanges.UIDStart = 10000
@@ -144,6 +155,23 @@ func (c *Config) Validate() error {
 		c.IDRanges.GIDStart = 10000
 	}
 	return nil
+}
+
+// ReadBindPasswordFile reads a credential file, trims whitespace, rejects empty
+// content, and requires permissions no more open than 0600.
+func ReadBindPasswordFile(path string) (string, error) {
+	if err := CheckPermissions(path, 0o600); err != nil {
+		return "", err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	pass := strings.TrimSpace(string(data))
+	if pass == "" {
+		return "", fmt.Errorf("credential file %s is empty", path)
+	}
+	return pass, nil
 }
 
 func (c *Config) PeopleDN() string {

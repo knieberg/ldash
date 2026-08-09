@@ -16,10 +16,12 @@ id_ranges:
   uid_start: 10000
   gid_start: 10000
 
+# Match filters to your directory schema (see docs/configuration.md).
+# Samba-only trees often use posixAccount (and may omit inetOrgPerson).
 search:
-  user_filter: "(&(objectClass=inetOrgPerson)(uid=%s))"
+  user_filter: "(&(|(objectClass=inetOrgPerson)(objectClass=posixAccount))(uid=%s))"
   group_filter: "(objectClass=posixGroup)"
-  list_users_filter: "(objectClass=inetOrgPerson)"
+  list_users_filter: "(|(objectClass=inetOrgPerson)(objectClass=posixAccount))"
 
 # Samba SID = domain_sid + "-" + (uidNumber * 2 + 1000). Replace with your domain SID locally.
 samba:

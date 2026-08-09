@@ -7,18 +7,14 @@ Thank you for your interest in contributing.
 1. Fork and clone the repository.
 2. Work as a normal user — do not develop as root inside the project tree.
 3. Run `make setup-local` to create **gitignored** local maintainer files (`GOALS.local.md`, `MAINTAINER.local.md`).
-4. Build and test:
+4. Build and run the full local CI parity check (tests, lint when available, vulnerability scan, hygiene):
 
 ```bash
 make build
-make test
+make ci
 ```
 
-5. Optional lint (requires [golangci-lint](https://golangci-lint.run/)):
-
-```bash
-make lint
-```
+5. Optional: run individual targets (`make test`, `make lint`, `make hygiene`) as needed. Lint requires [golangci-lint](https://golangci-lint.run/).
 
 ## Rules (mandatory)
 
@@ -31,7 +27,8 @@ make lint
 
 ## Pull request checklist
 
-- [ ] Tests pass (`make test`)
+- [ ] CI is green on the pull request (required)
+- [ ] Local checks pass (`make ci` — test, lint, vuln, hygiene)
 - [ ] No secrets or site-specific values in the diff
 - [ ] No editor/AI metadata staged
 - [ ] Documentation updated if behavior or config changed

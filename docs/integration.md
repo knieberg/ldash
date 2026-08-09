@@ -43,7 +43,7 @@ Replace values with those from your local config:
 ldapsearch -H ldap://ldap.example.com \
   -D "cn=admin,dc=example,dc=com" -W \
   -b "ou=People,dc=example,dc=com" \
-  "(objectClass=inetOrgPerson)" uid cn mail
+  "(|(objectClass=inetOrgPerson)(objectClass=posixAccount))" uid cn mail objectClass
 ```
 
 ## New user onboarding checklist

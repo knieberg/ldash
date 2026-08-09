@@ -501,7 +501,9 @@ func (m model) viewUsers() string {
 		b.WriteString("\n\n")
 	}
 	if len(m.users) == 0 {
-		b.WriteString(mutedStyle.Render("No users loaded. Press r to refresh."))
+		b.WriteString(mutedStyle.Render("No users found. Press r to refresh."))
+		b.WriteString("\n")
+		b.WriteString(warnStyle.Render("Check search.list_users_filter — does it match your LDAP object classes?"))
 		return b.String()
 	}
 	b.WriteString(headerStyle.Render(fmt.Sprintf("%-16s %-24s %-8s %s", "UID", "CN", "UID#", "MAIL")))
