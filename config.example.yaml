@@ -21,6 +21,10 @@ search:
   group_filter: "(objectClass=posixGroup)"
   list_users_filter: "(objectClass=inetOrgPerson)"
 
+# Samba SID = domain_sid + "-" + (uidNumber * 2 + 1000). Replace with your domain SID locally.
+samba:
+  domain_sid: "S-1-5-21-1000000000-2000000000-3000000000"
+
 templates_dir: "~/.config/ldash/templates"
 
 # Credentials: use ~/.config/ldash/credentials (mode 0600) or prompt on start.

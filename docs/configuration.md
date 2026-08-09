@@ -35,6 +35,9 @@ search:
   list_users_filter: "(objectClass=inetOrgPerson)"
 
 templates_dir: "~/.config/ldash/templates"
+
+samba:
+  domain_sid: "S-1-5-21-1000000000-2000000000-3000000000"
 ```
 
 ## TLS modes
@@ -45,9 +48,17 @@ templates_dir: "~/.config/ldash/templates"
 | `starttls` | Upgrade to TLS after connect |
 | `ldaps` | LDAP over TLS (typically port 636) |
 
+## Samba domain SID
+
+When creating users with `sambaSamAccount`, ldash sets `sambaSID` as:
+
+`{samba.domain_sid}-{uidNumber * 2 + 1000}`
+
+Put your real domain SID only in `~/.config/ldash/config.yaml` — never in the repository.
+
 ## User templates
 
-Copy `internal/templates/user_samba_posix.example.yaml` to:
+Copy happens automatically on `ldash config init` from `internal/templates/user_samba_posix.example.yaml` to:
 
 ```
 ~/.config/ldash/templates/user_samba_posix.yaml

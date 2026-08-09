@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-ldap/ldap/v3"
 
-	"github.com/ldash-sh/ldash/internal/config"
+	"github.com/knieberg/ldash/internal/config"
 )
 
 // Client wraps an LDAP connection for admin operations.
@@ -66,6 +66,11 @@ func (c *Client) Close() {
 		c.conn = nil
 		c.bound = false
 	}
+}
+
+// Conn exposes the underlying connection for advanced callers (tests).
+func (c *Client) Connected() bool {
+	return c.bound && c.conn != nil
 }
 
 func (c *Client) Ping(bindPassword string) PingResult {

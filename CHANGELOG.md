@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Main menu navigation and user management TUI (list, search, create, edit, delete)
+- Admin password reset and mail attribute management
+- User template copy on `ldash config init`
+- Samba SID generation from `samba.domain_sid` and uidNumber
+- Integration guide panel driven by local runtime config
+- Module path and GitHub references: `knieberg/ldash`
+
+### Changed
+
+- Stronger `.gitignore` for editor/AI metadata; lean contribution checklist
+
+## [0.0.1] — scaffold
+
+### Added
+
 - Initial project scaffold (Go, Bubble Tea, Cobra)
 - Config loader and `ldash config init`
 - Dashboard with LDAP connection test

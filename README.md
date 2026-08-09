@@ -1,7 +1,7 @@
 # ldash — LDAP Admin Shell
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Go Report Card](https://goreportcard.com/badge/github.com/ldash-sh/ldash)](https://goreportcard.com/report/github.com/ldash-sh/ldash)
+[![Go Report Card](https://goreportcard.com/badge/github.com/knieberg/ldash)](https://goreportcard.com/report/github.com/knieberg/ldash)
 
 **Terminal UI for OpenLDAP administration**
 
@@ -24,13 +24,15 @@ ldash is a terminal user interface (TUI) for managing users, groups, passwords, 
 | --- | --- |
 | Connection profiles (plain / StartTLS / LDAPS) | MVP |
 | Dashboard & connection test | MVP |
-| User list / search | Planned |
-| User create / edit / delete | Planned |
-| Admin password reset | Planned |
-| Email (`mail`) management | Planned |
+| Main menu navigation | MVP |
+| User list / search | MVP |
+| User create / edit / delete | MVP |
+| Admin password reset | MVP |
+| Email (`mail`) management | MVP |
+| Samba SID on user create | MVP |
+| Integration guide (from local config) | MVP |
 | Custom attributes | Planned |
-| Samba attribute view (sambaSID, flags) | Planned |
-| Integration guide (from local config) | Planned |
+| Samba attribute status view | Planned |
 | Group membership | v0.2 |
 | LDIF import / export | v0.2 |
 
@@ -38,14 +40,14 @@ ldash is a terminal user interface (TUI) for managing users, groups, passwords, 
 
 ### Requirements
 
-- Go 1.22+ (to build from source)
+- Go 1.24+ (to build from source)
 - OpenLDAP or compatible LDAP server
 - LDAP bind DN with administrative write access
 
 ### Build from source
 
 ```bash
-git clone https://github.com/ldash-sh/ldash.git
+git clone https://github.com/knieberg/ldash.git
 cd ldash
 make setup-local   # optional: creates gitignored maintainer docs locally
 make build
@@ -69,7 +71,20 @@ Example values in the repository always use **`dc=example,dc=com`** and **`ldap.
 | Key | Action |
 | --- | --- |
 | `r` | Test LDAP connection |
-| `q` | Quit |
+| `q` / `Esc` | Back / quit |
+
+### Keys (users)
+
+| Key | Action |
+| --- | --- |
+| `j` / `k` | Move |
+| `/` | Filter |
+| `c` | Create |
+| `e` | Edit |
+| `d` | Delete |
+| `p` | Reset password |
+| `m` | Edit mail |
+| `r` | Refresh |
 
 ## Supported backends
 

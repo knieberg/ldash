@@ -24,7 +24,8 @@ make lint
 
 - **Never commit environment-specific data** — no private IPs, real base DNs, hostnames, or credentials.
 - Use only **`example.com`** / **`dc=example,dc=com`** in tracked docs, tests, and examples.
-- Do not commit `.cursor/`, `*.local.md`, `local/`, `bin/`, or live configs.
+- Do not commit editor/AI project metadata (`.cursor/`, `.agents/`, `AGENTS.md`, `*.plan.md`), `*.local.md`, `local/`, `bin/`, or live configs.
+- Keep the repository lean: remove unused scratch files and avoid duplicate docs.
 - Integration-related output must come from **runtime config**, not hardcoded values in source.
 - English only for user-facing UI strings, README, and documentation in the repository.
 
@@ -32,8 +33,10 @@ make lint
 
 - [ ] Tests pass (`make test`)
 - [ ] No secrets or site-specific values in the diff
+- [ ] No editor/AI metadata staged
 - [ ] Documentation updated if behavior or config changed
 - [ ] Commit messages are clear and in English
+- [ ] Unused temporary files cleaned up
 
 ## Local maintainer docs
 

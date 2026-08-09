@@ -18,6 +18,9 @@ func TestLoadExample(t *testing.T) {
 	if cfg.PeopleDN() != "ou=People,dc=example,dc=com" {
 		t.Fatalf("unexpected people dn: %s", cfg.PeopleDN())
 	}
+	if cfg.Samba.DomainSID == "" {
+		t.Fatal("expected samba.domain_sid in example")
+	}
 }
 
 func TestValidateTLSMode(t *testing.T) {
@@ -43,5 +46,24 @@ func TestExpandPath(t *testing.T) {
 	want := filepath.Join(home, "foo")
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
+func TestSambaSID(t *testing.T) {
+	cfg := &Config{Samba: SambaConfig{DomainSID: "S-1-5-21-1-2-3"}}
+	got, err := cfg.SambaSID(10000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "S-1-5-21-1-2-3-21000"
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
+func TestSambaSIDMissing(t *testing.T) {
+	cfg := &Config{}
+	if _, err := cfg.SambaSID(10000); err == nil {
+		t.Fatal("expected error")
 	}
 }

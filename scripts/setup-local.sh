@@ -39,16 +39,18 @@ create_if_missing "MAINTAINER.local.md" <<'EOF'
 ## Git hygiene
 
 1. Commit `.gitignore` patterns before adding other files.
-2. Never commit: `.cursor/`, `*.local.md`, `local/`, secrets, `bin/`, live configs.
+2. Never commit: `.cursor/`, `.agents/`, `AGENTS.md`, `*.plan.md`, `*.local.md`, `local/`, secrets, `bin/`, live configs.
 3. Use only `example.com` / `dc=example,dc=com` in tracked docs and tests.
 4. Use a neutral public maintainer name/email for commits (no internal hostnames).
+5. Keep lean: delete unused scratch/docs at session end.
 
 ## Push checklist
 
 - [ ] `git status` — no unexpected files
 - [ ] `git diff` — no private DNs, IPs, URLs, usernames
 - [ ] No absolute home paths in tracked files
-- [ ] No credentials or `.local` artifacts staged
+- [ ] No credentials, `.local`, or Cursor/Agent artifacts staged
+- [ ] Unused temporary files removed (lean cleanup)
 
 ## Product scope reminders
 

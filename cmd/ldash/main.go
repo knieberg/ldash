@@ -8,8 +8,8 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/ldash-sh/ldash/internal/config"
-	"github.com/ldash-sh/ldash/internal/tui"
+	"github.com/knieberg/ldash/internal/config"
+	"github.com/knieberg/ldash/internal/tui"
 )
 
 var version = "dev"
@@ -56,12 +56,17 @@ func newConfigCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			dest, err := config.InitFromExample(example)
+			tplExample, err := findExampleTemplate()
+			if err != nil {
+				return err
+			}
+			dest, err := config.InitFromExample(example, tplExample)
 			if err != nil {
 				return err
 			}
 			fmt.Printf("Created config at %s\n", dest)
-			fmt.Println("Edit the file, then run: ldash")
+			fmt.Println("User template: ~/.config/ldash/templates/user_samba_posix.yaml")
+			fmt.Println("Edit the files, then run: ldash")
 			return nil
 		},
 	})
@@ -140,8 +145,16 @@ func readPasswordTerminal() (string, error) {
 }
 
 func findExampleConfig() (string, error) {
+	return findProjectFile("config.example.yaml")
+}
+
+func findExampleTemplate() (string, error) {
+	return findProjectFile(filepath.Join("internal", "templates", "user_samba_posix.example.yaml"))
+}
+
+func findProjectFile(rel string) (string, error) {
 	if exe, err := os.Executable(); err == nil {
-		candidate := filepath.Join(filepath.Dir(exe), "..", "config.example.yaml")
+		candidate := filepath.Join(filepath.Dir(exe), "..", rel)
 		if _, err := os.Stat(candidate); err == nil {
 			return candidate, nil
 		}
@@ -150,9 +163,9 @@ func findExampleConfig() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	candidate := filepath.Join(cwd, "config.example.yaml")
+	candidate := filepath.Join(cwd, rel)
 	if _, err := os.Stat(candidate); err == nil {
 		return candidate, nil
 	}
-	return "", fmt.Errorf("config.example.yaml not found; run from project root or set path manually")
+	return "", fmt.Errorf("%s not found; run from project root", rel)
 }

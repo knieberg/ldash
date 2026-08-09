@@ -4,7 +4,7 @@ set -euo pipefail
 
 VERSION="${LDASH_VERSION:-latest}"
 INSTALL_DIR="${LDASH_INSTALL_DIR:-/usr/local/bin}"
-REPO="ldash-sh/ldash"
+REPO="knieberg/ldash"
 
 echo "ldash installer"
 echo "  version: $VERSION"

@@ -31,9 +31,12 @@ coverage.out
 coverage.html
 *.prof
 
-# --- IDE / editor ---
+# --- IDE / editor / AI tooling (never commit) ---
 .cursor/
 .cursorrules
+.agents/
+AGENTS.md
+**/*.plan.md
 .vscode/
 !.vscode/extensions.json
 .idea/

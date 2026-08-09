@@ -5,12 +5,12 @@
 - Linux, macOS, or other Unix-like system with a terminal
 - OpenLDAP or compatible LDAP server
 - LDAP administrative bind DN
-- Go 1.22+ (when building from source)
+- Go 1.24+ (when building from source)
 
 ## Build from source (recommended until releases are published)
 
 ```bash
-git clone https://github.com/ldash-sh/ldash.git
+git clone https://github.com/knieberg/ldash.git
 cd ldash
 make build
 make install-local
@@ -72,7 +72,7 @@ credential_file: "~/.config/ldash/credentials"
 When releases are available:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ldash-sh/ldash/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/knieberg/ldash/main/scripts/install.sh | bash
 ```
 
 Until then, use the build-from-source steps above.
