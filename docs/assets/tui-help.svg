@@ -1,24 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="720" height="420" viewBox="0 0 720 420" role="img" aria-label="ldash help overlay mockup">
+  <title>ldash help overlay</title>
   <rect width="720" height="420" rx="8" fill="#020617"/>
   <rect x="1" y="1" width="718" height="418" rx="8" fill="none" stroke="#334155" stroke-width="2"/>
-  <text x="24" y="36" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" font-weight="700" fill="#60A5FA">ldash  LDAP Admin Shell</text>
-  <text x="24" y="58" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#94A3B8">Main Menu : </text>
-  <text x="118" y="58" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" font-weight="700" fill="#67E8F9">Users</text>
+  <text x="24" y="36" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="16" font-weight="700" fill="#60A5FA">ldash - LDAP Admin Shell</text>
+  <text x="24" y="58" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#94A3B8">Main Menu &gt; </text>
+  <text x="132" y="58" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" font-weight="700" fill="#67E8F9">Users</text>
   <line x1="24" y1="72" x2="696" y2="72" stroke="#475569" stroke-width="1"/>
-  <text x="40" y="110" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#475569">  alice   Alice Example   &</text>
-  <text x="40" y="130" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#475569">  bob     Bob Example     &</text>
+  <text x="40" y="110" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#475569">  alice   Alice Example   ...</text>
+  <text x="40" y="130" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#475569">  bob     Bob Example     ...</text>
   <rect x="140" y="100" width="440" height="240" rx="8" fill="#0F172A" stroke="#67E8F9" stroke-width="2"/>
-  <text x="160" y="128" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" font-weight="700" fill="#67E8F9">Help</text>
-  <text x="160" y="156" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" font-weight="700" fill="#67E8F9">Navigation</text>
-  <text x="160" y="178" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#E2E8F0">  Esc     one level back</text>
-  <text x="160" y="196" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#E2E8F0">  q       quit (main menu only)</text>
-  <text x="160" y="214" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#E2E8F0">  Ctrl+C  quit anytime</text>
-  <text x="160" y="232" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#E2E8F0">  ?       toggle this help</text>
-  <text x="160" y="250" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#E2E8F0">  1-6     open main menu item</text>
-  <text x="160" y="278" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" font-weight="700" fill="#67E8F9">This view</text>
-  <text x="160" y="300" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#E2E8F0">  j/k · PgUp/PgDn · / search · c e d p m · r</text>
-  <text x="160" y="322" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#94A3B8">Press Esc or ? to close</text>
+  <text x="160" y="128" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" font-weight="700" fill="#67E8F9">Help</text>
+  <text x="160" y="156" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" font-weight="700" fill="#67E8F9">Navigation</text>
+  <text x="160" y="178" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#E2E8F0">  Esc     one level back</text>
+  <text x="160" y="196" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#E2E8F0">  q       quit (main menu only)</text>
+  <text x="160" y="214" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#E2E8F0">  Ctrl+C  quit anytime</text>
+  <text x="160" y="232" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#E2E8F0">  ?       toggle this help</text>
+  <text x="160" y="250" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#E2E8F0">  1-6     open main menu item</text>
+  <text x="160" y="278" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" font-weight="700" fill="#67E8F9">This view</text>
+  <text x="160" y="300" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#E2E8F0">  j/k | PgUp/PgDn | / search | c e d p m | r</text>
+  <text x="160" y="322" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#94A3B8">Press Esc or ? to close</text>
   <rect x="24" y="372" width="672" height="28" fill="#1E293B"/>
-  <text x="36" y="390" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#94A3B8">j/k · PgUp/PgDn · / · c e d p m · r · Esc back · ?</text>
-  <text x="520" y="390" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#94A3B8">3 user(s)</text>
+  <text x="36" y="390" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#94A3B8">j/k | PgUp/PgDn | / | c e d p m | r | Esc back | ?</text>
+  <text x="520" y="390" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#94A3B8">3 user(s)</text>
 </svg>
