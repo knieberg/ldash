@@ -15,6 +15,7 @@ ldash is a terminal user interface (TUI) for managing users, groups, passwords, 
 - [Documentation](./docs/)
 - [Installation](./docs/installation.md)
 - [Configuration](./docs/configuration.md)
+- [Terminal UI guide](./docs/tui.md)
 - [Integration guide](./docs/integration.md)
 - [Contributing](./CONTRIBUTING.md)
 
@@ -66,25 +67,22 @@ ldash
 
 Example values in the repository always use **`dc=example,dc=com`** and **`ldap.example.com`**.
 
-### Keys (dashboard)
+### Keys (summary)
 
 | Key | Action |
 | --- | --- |
-| `r` | Test LDAP connection |
-| `q` / `Esc` | Back / quit |
-
-### Keys (users)
-
-| Key | Action |
-| --- | --- |
+| `Esc` | One level back |
+| `q` | Quit (main menu only) |
+| `Ctrl+C` | Quit anytime |
+| `?` | Help overlay |
+| `1`–`6` | Open main menu item |
+| `r` | Refresh / test connection |
 | `j` / `k` | Move |
-| `/` | Filter |
-| `c` | Create |
-| `e` | Edit |
-| `d` | Delete |
-| `p` | Reset password |
-| `m` | Edit mail |
-| `r` | Refresh |
+| `PgUp` / `PgDn` | Page users list |
+| `/` | Filter users |
+| `c` `e` `d` `p` `m` | Create / edit / delete / password / mail |
+
+Full key reference and screenshots: [Terminal UI guide](./docs/tui.md).
 
 ## Supported backends
 

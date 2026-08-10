@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="420" viewBox="0 0 720 420" role="img" aria-label="ldash users list mockup">
+  <rect width="720" height="420" rx="8" fill="#020617"/>
+  <rect x="1" y="1" width="718" height="418" rx="8" fill="none" stroke="#334155" stroke-width="2"/>
+  <text x="24" y="36" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" font-weight="700" fill="#60A5FA">ldash  LDAP Admin Shell</text>
+  <text x="24" y="58" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#94A3B8">Main Menu : </text>
+  <text x="118" y="58" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" font-weight="700" fill="#67E8F9">Users</text>
+  <line x1="24" y1="72" x2="696" y2="72" stroke="#475569" stroke-width="1"/>
+  <rect x="24" y="92" width="672" height="260" rx="8" fill="#0F172A" stroke="#475569"/>
+  <text x="40" y="118" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" font-weight="700" fill="#67E8F9">  UID            CN                      UID#     MAIL</text>
+  <rect x="40" y="128" width="640" height="22" fill="#1E3A5F"/>
+  <text x="48" y="143" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#FEF08A">¸ alice          Alice Example           10001    alice@example.com</text>
+  <text x="48" y="167" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#E2E8F0">  bob            Bob Example             10002    bob@example.com</text>
+  <text x="48" y="191" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#E2E8F0">  jdoe           Jane Doe                10003    jdoe@example.com</text>
+  <text x="40" y="230" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#94A3B8">Showing 13 of 3</text>
+  <text x="40" y="260" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#94A3B8">Server: ldap.example.com · base dc=example,dc=com</text>
+  <rect x="24" y="372" width="672" height="28" fill="#1E293B"/>
+  <text x="36" y="390" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#94A3B8">j/k · PgUp/PgDn · / · c e d p m · r · Esc back · ?</text>
+  <text x="560" y="390" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#94A3B8">3 user(s)</text>
+</svg>

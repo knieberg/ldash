@@ -2,10 +2,12 @@ package tui
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/knieberg/ldash/internal/config"
 	ldapclient "github.com/knieberg/ldash/internal/ldap"
@@ -50,9 +52,10 @@ type groupsLoadedMsg struct {
 }
 
 type menuItem struct {
-	id    viewID
-	label string
-	hint  string
+	id      viewID
+	label   string
+	hint    string
+	enabled bool
 }
 
 type model struct {
@@ -61,10 +64,13 @@ type model struct {
 	password string
 	client   *ldapclient.Client
 
-	current viewID
-	width   int
-	height  int
-	status  string
+	current  viewID
+	width    int
+	height   int
+	status   string
+	statusK  statusKind
+	busy     bool
+	showHelp bool
 	quitting bool
 
 	menuCursor int
@@ -72,15 +78,16 @@ type model struct {
 
 	pingResult *ldapclient.PingResult
 
-	users       []ldapclient.User
-	userCursor  int
-	userFilter  string
-	searching   bool
-	searchInput textinput.Model
+	users        []ldapclient.User
+	userCursor   int
+	userFilter   string
+	searching    bool
+	searchInput  textinput.Model
+	scrollOffset int
 
 	formInputs []textinput.Model
 	formFocus  int
-	formUID    string // for edit/delete/password/mail target
+	formUID    string
 	formDN     string
 	confirm    bool
 	groups     []ldapclient.GroupRef
@@ -102,14 +109,15 @@ func New(cfg *config.Config, password string, integ *config.Integration) tea.Mod
 		client:      ldapclient.NewClient(cfg),
 		current:     viewMenu,
 		status:      "Select a view and press Enter",
+		statusK:     statusInfo,
 		searchInput: si,
 		menuItems: []menuItem{
-			{viewDashboard, "Dashboard", "Connection health"},
-			{viewUsers, "Users", "List, create, edit, delete"},
-			{viewGroups, "Groups", "Coming in v0.2"},
-			{viewSamba, "Samba", "Coming soon"},
-			{viewIntegration, "Integration Guide", "Runtime snippets from local config"},
-			{viewSettings, "Settings", "Shows loaded connection profile"},
+			{viewDashboard, "Dashboard", "Connection health", true},
+			{viewUsers, "Users", "List, create, edit, delete", true},
+			{viewGroups, "Groups", "Coming in v0.2", false},
+			{viewSamba, "Samba", "Coming soon", false},
+			{viewIntegration, "Integration Guide", "Runtime snippets from local config", true},
+			{viewSettings, "Settings", "Shows loaded connection profile", true},
 		},
 	}
 }
@@ -118,66 +126,90 @@ func (m model) Init() tea.Cmd {
 	return nil
 }
 
+func (m *model) setStatus(kind statusKind, msg string) {
+	m.statusK = kind
+	m.status = msg
+}
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.resizeInputs()
+		m.ensureUserVisible()
 		return m, nil
 
 	case pingMsg:
+		m.busy = false
 		if msg.err != nil {
-			m.status = msg.err.Error()
+			m.setStatus(statusError, msg.err.Error())
 			m.pingResult = nil
 		} else {
 			m.pingResult = &msg.result
 			if msg.result.OK {
-				m.status = fmt.Sprintf("Connected in %s", msg.result.Duration.Round(1e6))
+				m.setStatus(statusOK, fmt.Sprintf("Connected in %s", msg.result.Duration.Round(1e6)))
 			} else {
-				m.status = msg.result.Message
+				m.setStatus(statusError, msg.result.Message)
 			}
 		}
 		return m, nil
 
 	case usersLoadedMsg:
+		m.busy = false
 		if msg.err != nil {
-			m.status = msg.err.Error()
+			m.setStatus(statusError, msg.err.Error())
 			m.users = nil
 		} else {
 			m.users = msg.users
 			if m.userCursor >= len(m.users) {
 				m.userCursor = 0
 			}
-			m.status = fmt.Sprintf("%d user(s)", len(m.users))
+			m.ensureUserVisible()
+			m.setStatus(statusInfo, fmt.Sprintf("%d user(s)", len(m.users)))
 		}
 		return m, nil
 
 	case groupsLoadedMsg:
+		m.busy = false
 		if msg.err != nil {
-			m.status = msg.err.Error()
+			m.setStatus(statusError, msg.err.Error())
 		} else {
 			m.groups = msg.groups
 		}
 		return m, nil
 
 	case actionDoneMsg:
+		m.busy = false
 		if msg.err != nil {
-			m.status = msg.err.Error()
+			m.setStatus(statusError, msg.err.Error())
 		} else {
-			m.status = msg.message
+			m.setStatus(statusOK, msg.message)
 			if msg.reload {
 				m.current = viewUsers
 				m.confirm = false
+				m.busy = true
+				m.setStatus(statusLoading, "Refreshing users...")
 				return m, m.loadUsersCmd()
 			}
 		}
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.showHelp {
+			switch msg.String() {
+			case keyHelp, keyBack:
+				m.showHelp = false
+				return m, nil
+			case "ctrl+c":
+				return m.quit()
+			}
+			return m, nil
+		}
 		if m.searching && m.current == viewUsers {
 			return m.updateUserSearch(msg)
 		}
-		if m.current == viewUserCreate || m.current == viewUserEdit || m.current == viewUserPassword || m.current == viewUserMail {
+		if m.isFormView() {
 			return m.updateForm(msg)
 		}
 		if m.current == viewUserDelete {
@@ -188,51 +220,70 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m model) isFormView() bool {
+	return m.current == viewUserCreate || m.current == viewUserEdit ||
+		m.current == viewUserPassword || m.current == viewUserMail
+}
+
+func (m model) isUserChild() bool {
+	return m.isFormView() || m.current == viewUserDelete
+}
+
+func (m model) quit() (tea.Model, tea.Cmd) {
+	m.quitting = true
+	m.closeClient()
+	return m, tea.Quit
+}
+
+func (m model) goBack() (tea.Model, tea.Cmd) {
+	if m.showHelp {
+		m.showHelp = false
+		return m, nil
+	}
+	if m.searching && m.current == viewUsers {
+		m.searching = false
+		m.searchInput.Blur()
+		return m, nil
+	}
+	if m.isUserChild() {
+		m.current = viewUsers
+		m.confirm = false
+		m.setStatus(statusInfo, "Cancelled")
+		return m, nil
+	}
+	if m.current != viewMenu {
+		m.current = viewMenu
+		m.setStatus(statusInfo, "Main menu")
+		return m, nil
+	}
+	m.setStatus(statusInfo, "Press q to quit")
+	return m, nil
+}
+
 func (m model) updateNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "ctrl+c":
-		m.quitting = true
-		m.closeClient()
-		return m, tea.Quit
+		return m.quit()
+	case keyHelp:
+		m.showHelp = true
+		return m, nil
 	case keyQuit:
 		if m.current == viewMenu {
-			m.quitting = true
-			m.closeClient()
-			return m, tea.Quit
+			return m.quit()
 		}
-		m.current = viewMenu
-		m.status = "Main menu"
+		// q is not back on other views
 		return m, nil
 	case keyBack:
-		if m.current != viewMenu {
-			m.current = viewMenu
-			m.status = "Main menu"
-			return m, nil
-		}
+		return m.goBack()
 	}
 
 	switch m.current {
 	case viewMenu:
-		switch msg.String() {
-		case keyUp, "up":
-			if m.menuCursor > 0 {
-				m.menuCursor--
-			}
-		case keyDown, "down":
-			if m.menuCursor < len(m.menuItems)-1 {
-				m.menuCursor++
-			}
-		case keyEnter:
-			item := m.menuItems[m.menuCursor]
-			m.current = item.id
-			m.status = item.label
-			if item.id == viewUsers {
-				return m, m.ensureConnAnd(m.loadUsersCmd())
-			}
-		}
+		return m.updateMenu(msg)
 	case viewDashboard:
 		if msg.String() == keyRefresh {
-			m.status = "Testing connection..."
+			m.busy = true
+			m.setStatus(statusLoading, "Testing connection...")
 			return m, m.pingCmd()
 		}
 	case viewUsers:
@@ -241,21 +292,89 @@ func (m model) updateNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m model) updateMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	n := len(m.menuItems)
+	if n == 0 {
+		return m, nil
+	}
+	switch msg.String() {
+	case keyUp, "up":
+		m.menuCursor = (m.menuCursor - 1 + n) % n
+	case keyDown, "down":
+		m.menuCursor = (m.menuCursor + 1) % n
+	case keyEnter:
+		return m.openMenuItem(m.menuCursor)
+	default:
+		if len(msg.String()) == 1 {
+			if d, err := strconv.Atoi(msg.String()); err == nil && d >= 1 && d <= n {
+				m.menuCursor = d - 1
+				return m.openMenuItem(m.menuCursor)
+			}
+		}
+	}
+	return m, nil
+}
+
+func (m model) openMenuItem(idx int) (tea.Model, tea.Cmd) {
+	if idx < 0 || idx >= len(m.menuItems) {
+		return m, nil
+	}
+	item := m.menuItems[idx]
+	if !item.enabled {
+		m.setStatus(statusWarn, item.label+" available in a later release")
+		return m, nil
+	}
+	m.current = item.id
+	m.setStatus(statusInfo, item.label)
+	if item.id == viewUsers {
+		m.busy = true
+		m.setStatus(statusLoading, "Loading users...")
+		return m, m.ensureConnAnd(m.loadUsersCmd())
+	}
+	return m, nil
+}
+
 func (m model) updateUsersList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	page := m.userPageSize()
 	switch msg.String() {
 	case keyUp, "up":
 		if m.userCursor > 0 {
 			m.userCursor--
+			m.ensureUserVisible()
 		}
 	case keyDown, "down":
 		if m.userCursor < len(m.users)-1 {
 			m.userCursor++
+			m.ensureUserVisible()
 		}
+	case keyPgUp:
+		m.userCursor -= page
+		if m.userCursor < 0 {
+			m.userCursor = 0
+		}
+		m.ensureUserVisible()
+	case keyPgDown:
+		m.userCursor += page
+		if m.userCursor >= len(m.users) {
+			m.userCursor = max(0, len(m.users)-1)
+		}
+		m.ensureUserVisible()
+	case keyHome, keyTop:
+		m.userCursor = 0
+		m.ensureUserVisible()
+	case keyEnd, keyBottom:
+		if len(m.users) > 0 {
+			m.userCursor = len(m.users) - 1
+		}
+		m.ensureUserVisible()
 	case keyRefresh:
+		m.busy = true
+		m.setStatus(statusLoading, "Refreshing users...")
 		return m, m.ensureConnAnd(m.loadUsersCmd())
 	case keySearch:
 		m.searching = true
 		m.searchInput.SetValue(m.userFilter)
+		m.searchInput.Width = formInputWidth(m.width)
 		m.searchInput.Focus()
 		return m, textinput.Blink
 	case keyCreate:
@@ -274,6 +393,8 @@ func (m model) updateUsersList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.formDN = u.DN
 			m.confirm = false
 			m.current = viewUserDelete
+			m.busy = true
+			m.setStatus(statusLoading, "Loading group refs...")
 			return m, m.ensureConnAnd(m.loadGroupsCmd(u.UID, u.DN))
 		}
 	case keyPassword:
@@ -298,11 +419,18 @@ func (m model) updateUserSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.searching = false
 		m.searchInput.Blur()
 		return m, nil
+	case "ctrl+u":
+		m.searchInput.SetValue("")
+		return m, nil
 	case keyEnter:
 		m.userFilter = m.searchInput.Value()
 		m.searching = false
 		m.searchInput.Blur()
+		m.busy = true
+		m.setStatus(statusLoading, "Filtering users...")
 		return m, m.ensureConnAnd(m.loadUsersCmd())
+	case "ctrl+c":
+		return m.quit()
 	}
 	var cmd tea.Cmd
 	m.searchInput, cmd = m.searchInput.Update(msg)
@@ -312,9 +440,12 @@ func (m model) updateUserSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m model) updateForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case keyBack:
-		m.current = viewUsers
-		m.status = "Cancelled"
+		return m.goBack()
+	case keyHelp:
+		m.showHelp = true
 		return m, nil
+	case "ctrl+c":
+		return m.quit()
 	case "tab", "down":
 		m.formFocus = (m.formFocus + 1) % len(m.formInputs)
 		return m, m.focusForm()
@@ -322,6 +453,8 @@ func (m model) updateForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.formFocus = (m.formFocus - 1 + len(m.formInputs)) % len(m.formInputs)
 		return m, m.focusForm()
 	case keyEnter:
+		m.busy = true
+		m.setStatus(statusLoading, "Submitting...")
 		return m.submitForm()
 	}
 	var cmd tea.Cmd
@@ -332,15 +465,20 @@ func (m model) updateForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m model) updateDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case keyBack, "n":
-		m.current = viewUsers
-		m.status = "Delete cancelled"
+		return m.goBack()
+	case keyHelp:
+		m.showHelp = true
 		return m, nil
+	case "ctrl+c":
+		return m.quit()
 	case "y":
 		if !m.confirm {
 			m.confirm = true
-			m.status = "Press y again to confirm delete"
+			m.setStatus(statusWarn, "Press y again to confirm delete")
 			return m, nil
 		}
+		m.busy = true
+		m.setStatus(statusLoading, "Deleting user...")
 		return m, m.ensureConnAnd(m.deleteUserCmd())
 	}
 	return m, nil
@@ -364,119 +502,274 @@ func (m model) selectedUser() *ldapclient.User {
 	return &m.users[m.userCursor]
 }
 
+func (m *model) resizeInputs() {
+	w := formInputWidth(m.width)
+	m.searchInput.Width = w
+	for i := range m.formInputs {
+		m.formInputs[i].Width = w
+	}
+}
+
+func (m model) contentHeight() int {
+	// Approximate shell chrome: title + crumb + rule + footer bar.
+	chrome := 5
+	h := m.height - chrome
+	if h < 5 {
+		h = 5
+	}
+	return h
+}
+
+func (m model) userPageSize() int {
+	h := m.contentHeight() - 6 // panel padding, filter, header, meta
+	if h < 3 {
+		h = 3
+	}
+	return h
+}
+
+func (m *model) ensureUserVisible() {
+	page := m.userPageSize()
+	if m.userCursor < m.scrollOffset {
+		m.scrollOffset = m.userCursor
+	}
+	if m.userCursor >= m.scrollOffset+page {
+		m.scrollOffset = m.userCursor - page + 1
+	}
+	if m.scrollOffset < 0 {
+		m.scrollOffset = 0
+	}
+}
+
 func (m model) View() string {
 	if m.quitting {
 		return ""
 	}
-	var b strings.Builder
-	b.WriteString(titleStyle.Render("ldash — LDAP Admin Shell"))
-	b.WriteString("\n")
-	b.WriteString(mutedStyle.Render(m.breadcrumb()))
-	b.WriteString("\n\n")
+	w := m.width
+	if w <= 0 {
+		w = 80
+	}
+	h := m.height
+	if h <= 0 {
+		h = 24
+	}
 
+	header := renderHeader("ldash — LDAP Admin Shell", m.breadcrumbStyled(), w)
+	body := m.viewBody()
+	if m.showHelp {
+		body = m.overlayHelp(body, w)
+	}
+	footer := renderFooterBar(m.footerKeys(), statusLine(m.statusK, m.status), w)
+	return renderShell(header, body, footer, w, h)
+}
+
+func (m model) viewBody() string {
+	aw := appWidth(m.width)
+	var content string
 	switch m.current {
 	case viewMenu:
-		b.WriteString(m.viewMenu())
+		content = m.viewMenu()
 	case viewDashboard:
-		b.WriteString(m.viewDashboard())
+		content = m.viewDashboard()
 	case viewUsers:
-		b.WriteString(m.viewUsers())
+		content = m.viewUsers()
 	case viewGroups:
-		b.WriteString(mutedStyle.Render("Group membership management is planned for v0.2."))
+		content = mutedStyle.Render("Group membership management is planned for v0.2.") +
+			"\n" + mutedStyle.Render("Press Esc to return to the main menu.")
 	case viewSamba:
-		b.WriteString(mutedStyle.Render("Samba status view is planned for a later release."))
+		content = mutedStyle.Render("Samba status view is planned for a later release.") +
+			"\n" + mutedStyle.Render("Press Esc to return to the main menu.")
 	case viewIntegration:
-		b.WriteString(m.viewIntegration())
+		content = m.viewIntegration()
 	case viewSettings:
-		b.WriteString(m.viewSettings())
+		content = m.viewSettings()
 	case viewUserCreate, viewUserEdit, viewUserPassword, viewUserMail:
-		b.WriteString(m.viewForm())
+		content = m.viewForm()
 	case viewUserDelete:
-		b.WriteString(m.viewDelete())
+		content = m.viewDelete()
+	default:
+		content = ""
 	}
+	return panel(content, aw)
+}
 
+func (m model) overlayHelp(body string, width int) string {
+	help := m.helpContent()
+	box := helpBox(help, width)
+	// Place help over the upper content area.
+	return lipgloss.Place(width, lipgloss.Height(body), lipgloss.Center, lipgloss.Center, box,
+		lipgloss.WithWhitespaceChars(" "),
+		lipgloss.WithWhitespaceForeground(colorMuted),
+	)
+}
+
+func (m model) helpContent() string {
+	var b strings.Builder
+	b.WriteString(headerStyle.Render("Help"))
 	b.WriteString("\n\n")
-	b.WriteString(mutedStyle.Render(m.footer()))
+	b.WriteString(headerStyle.Render("Navigation"))
 	b.WriteString("\n")
-	if m.status != "" {
-		b.WriteString(m.status)
+	b.WriteString("  Esc     one level back\n")
+	b.WriteString("  q       quit (main menu only)\n")
+	b.WriteString("  Ctrl+C  quit anytime\n")
+	b.WriteString("  ?       toggle this help\n")
+	b.WriteString("  1-6     open main menu item\n")
+	b.WriteString("\n")
+	b.WriteString(headerStyle.Render("This view"))
+	b.WriteString("\n")
+	for _, line := range strings.Split(m.helpViewKeys(), "\n") {
+		b.WriteString("  " + line + "\n")
 	}
+	b.WriteString("\n")
+	b.WriteString(mutedStyle.Render("Press Esc or ? to close"))
 	return b.String()
 }
 
-func (m model) breadcrumb() string {
+func (m model) helpViewKeys() string {
 	switch m.current {
 	case viewMenu:
-		return "Main Menu"
+		return "j/k move · Enter open · disabled items stay on menu"
 	case viewDashboard:
-		return "Main Menu › Dashboard"
+		return "r test LDAP connection"
 	case viewUsers:
-		return "Main Menu › Users"
-	case viewUserCreate:
-		return "Main Menu › Users › Create"
-	case viewUserEdit:
-		return "Main Menu › Users › Edit"
+		if m.searching {
+			return "Enter apply · Esc cancel · Ctrl+U clear filter text"
+		}
+		return "j/k move · PgUp/PgDn page · g/G or Home/End · / search · c e d p m · r refresh"
+	case viewUserCreate, viewUserEdit, viewUserPassword, viewUserMail:
+		return "Tab next field · Enter submit · Esc cancel"
 	case viewUserDelete:
-		return "Main Menu › Users › Delete"
-	case viewUserPassword:
-		return "Main Menu › Users › Password"
-	case viewUserMail:
-		return "Main Menu › Users › Mail"
-	case viewGroups:
-		return "Main Menu › Groups"
-	case viewSamba:
-		return "Main Menu › Samba"
-	case viewIntegration:
-		return "Main Menu › Integration Guide"
-	case viewSettings:
-		return "Main Menu › Settings"
+		return "y confirm (twice) · n or Esc cancel"
 	default:
-		return ""
+		return "Esc back"
 	}
 }
 
-func (m model) footer() string {
+func (m model) breadcrumbStyled() string {
+	parts := m.breadcrumbParts()
+	if len(parts) == 0 {
+		return ""
+	}
+	var out []string
+	for i, p := range parts {
+		if i == len(parts)-1 {
+			out = append(out, crumbActiveStyle.Render(p))
+		} else {
+			out = append(out, crumbStyle.Render(p))
+		}
+	}
+	return strings.Join(out, crumbStyle.Render(" › "))
+}
+
+func (m model) breadcrumbParts() []string {
 	switch m.current {
 	case viewMenu:
-		return "Keys: j/k move · Enter open · q quit"
+		return []string{"Main Menu"}
 	case viewDashboard:
-		return "Keys: r test connection · Esc/q back"
+		return []string{"Main Menu", "Dashboard"}
+	case viewUsers:
+		return []string{"Main Menu", "Users"}
+	case viewUserCreate:
+		return []string{"Main Menu", "Users", "Create"}
+	case viewUserEdit:
+		return []string{"Main Menu", "Users", "Edit"}
+	case viewUserDelete:
+		return []string{"Main Menu", "Users", "Delete"}
+	case viewUserPassword:
+		return []string{"Main Menu", "Users", "Password"}
+	case viewUserMail:
+		return []string{"Main Menu", "Users", "Mail"}
+	case viewGroups:
+		return []string{"Main Menu", "Groups"}
+	case viewSamba:
+		return []string{"Main Menu", "Samba"}
+	case viewIntegration:
+		return []string{"Main Menu", "Integration Guide"}
+	case viewSettings:
+		return []string{"Main Menu", "Settings"}
+	default:
+		return nil
+	}
+}
+
+func (m model) footerKeys() string {
+	base := ""
+	switch m.current {
+	case viewMenu:
+		base = "j/k · 1-6 · Enter · ? · q quit"
+	case viewDashboard:
+		base = "r test · Esc back · ?"
 	case viewUsers:
 		if m.searching {
-			return "Keys: Enter apply filter · Esc cancel"
+			base = "Enter apply · Esc cancel · Ctrl+U clear · ?"
+		} else if m.userFilter != "" {
+			base = "j/k · PgUp/PgDn · / search · c e d p m · r · Esc back · ? (filter on)"
+		} else {
+			base = "j/k · PgUp/PgDn · / · c e d p m · r · Esc back · ?"
 		}
-		return "Keys: j/k · / search · c create · e edit · d delete · p password · m mail · r refresh · Esc/q back"
 	case viewUserCreate, viewUserEdit, viewUserPassword, viewUserMail:
-		return "Keys: Tab next field · Enter submit · Esc cancel"
+		base = "Tab · Enter submit · Esc cancel · ?"
 	case viewUserDelete:
-		return "Keys: y confirm · n/Esc cancel"
+		base = "y confirm · n/Esc cancel · ?"
 	default:
-		return "Keys: Esc/q back"
+		base = "Esc back · ?"
 	}
+	if m.busy {
+		return base
+	}
+	return base
 }
 
 func (m model) viewMenu() string {
 	var b strings.Builder
+	b.WriteString(headerStyle.Render("Navigate"))
+	b.WriteString("\n\n")
+	aw := appWidth(m.width)
+	labelW := 20
 	for i, item := range m.menuItems {
-		line := fmt.Sprintf("  %-18s %s", item.label, mutedStyle.Render(item.hint))
-		if i == m.menuCursor {
-			line = selStyle.Render(fmt.Sprintf("▸ %-18s %s", item.label, item.hint))
+		num := fmt.Sprintf("%d", i+1)
+		label := item.label
+		hint := item.hint
+		if !item.enabled {
+			hint = item.hint
 		}
-		b.WriteString(line)
+		pad := aw - 8 - labelW - 4
+		if pad < 8 {
+			pad = 8
+		}
+		hintShown := truncRunes(hint, pad)
+		raw := fmt.Sprintf("%s  %-*s  %s", num, labelW, label, hintShown)
+		switch {
+		case i == m.menuCursor && item.enabled:
+			b.WriteString(selStyle.Render("▸ " + raw))
+		case i == m.menuCursor && !item.enabled:
+			b.WriteString(selStyle.Render("▸ " + raw))
+		case !item.enabled:
+			b.WriteString(disabledStyle.Render("  " + raw))
+		default:
+			b.WriteString("  " + raw)
+		}
 		b.WriteString("\n")
 	}
+	b.WriteString("\n")
+	b.WriteString(mutedStyle.Render("Disabled items show a warning and stay on this menu."))
 	return b.String()
 }
 
 func (m model) viewDashboard() string {
 	var b strings.Builder
+	aw := appWidth(m.width)
+	inner := aw - 6
+	if inner < 20 {
+		inner = 20
+	}
 	lines := []string{
 		fmt.Sprintf("Server:  %s (%s)", m.cfg.Server.URL, m.cfg.Server.TLSMode),
 		fmt.Sprintf("Base DN: %s", m.cfg.BaseDN),
 		fmt.Sprintf("People:  %s", m.cfg.PeopleDN()),
 		fmt.Sprintf("Groups:  %s", m.cfg.GroupsDN()),
 	}
-	b.WriteString(boxStyle.Render(strings.Join(lines, "\n")))
+	b.WriteString(boxStyle.Width(inner).Render(strings.Join(lines, "\n")))
 	b.WriteString("\n\n")
 	if m.pingResult != nil {
 		if m.pingResult.OK {
@@ -490,26 +783,78 @@ func (m model) viewDashboard() string {
 	return b.String()
 }
 
+func (m model) columnWidths() (uidW, cnW, numW, mailW int) {
+	aw := appWidth(m.width) - 4 // cursor prefix
+	if aw < 40 {
+		aw = 40
+	}
+	uidW = 14
+	numW = 8
+	cnW = aw / 3
+	if cnW < 12 {
+		cnW = 12
+	}
+	if cnW > 28 {
+		cnW = 28
+	}
+	mailW = aw - uidW - cnW - numW - 3
+	if mailW < 8 {
+		mailW = 0
+	}
+	if mailW > 40 {
+		mailW = 40
+	}
+	return uidW, cnW, numW, mailW
+}
+
 func (m model) viewUsers() string {
 	var b strings.Builder
 	if m.searching {
 		b.WriteString("Filter: ")
 		b.WriteString(m.searchInput.View())
-		b.WriteString("\n\n")
+		b.WriteString("\n")
 	} else if m.userFilter != "" {
 		b.WriteString(mutedStyle.Render(fmt.Sprintf("Filter: %q", m.userFilter)))
-		b.WriteString("\n\n")
-	}
-	if len(m.users) == 0 {
-		b.WriteString(mutedStyle.Render("No users found. Press r to refresh."))
 		b.WriteString("\n")
-		b.WriteString(warnStyle.Render("Check search.list_users_filter — does it match your LDAP object classes?"))
+	}
+
+	if len(m.users) == 0 {
+		b.WriteString(mutedStyle.Render("No users found."))
+		b.WriteString("\n")
+		b.WriteString(mutedStyle.Render("Press r to refresh · c to create · / to change filter."))
+		b.WriteString("\n")
+		b.WriteString(warnStyle.Render("Warn: Check search.list_users_filter — does it match your LDAP object classes?"))
 		return b.String()
 	}
-	b.WriteString(headerStyle.Render(fmt.Sprintf("%-16s %-24s %-8s %s", "UID", "CN", "UID#", "MAIL")))
+
+	uidW, cnW, numW, mailW := m.columnWidths()
+	headers := []string{"UID", "CN", "UID#"}
+	widths := []int{uidW, cnW, numW}
+	if mailW > 0 {
+		headers = append(headers, "MAIL")
+		widths = append(widths, mailW)
+	}
+	b.WriteString(headerStyle.Render("  "+padColumns(headers, widths)))
 	b.WriteString("\n")
-	for i, u := range m.users {
-		line := fmt.Sprintf("%-16s %-24s %-8d %s", trunc(u.UID, 16), trunc(u.CN, 24), u.UIDNumber, trunc(u.Mail, 32))
+
+	page := m.userPageSize()
+	start := m.scrollOffset
+	if start < 0 {
+		start = 0
+	}
+	end := start + page
+	if end > len(m.users) {
+		end = len(m.users)
+	}
+	for i := start; i < end; i++ {
+		u := m.users[i]
+		cols := []string{u.UID, u.CN, strconv.Itoa(u.UIDNumber)}
+		ws := []int{uidW, cnW, numW}
+		if mailW > 0 {
+			cols = append(cols, u.Mail)
+			ws = append(ws, mailW)
+		}
+		line := padColumns(cols, ws)
 		if i == m.userCursor {
 			b.WriteString(selStyle.Render("▸ " + line))
 		} else {
@@ -517,14 +862,21 @@ func (m model) viewUsers() string {
 		}
 		b.WriteString("\n")
 	}
+	b.WriteString("\n")
+	b.WriteString(mutedStyle.Render(fmt.Sprintf("Showing %d–%d of %d", start+1, end, len(m.users))))
 	return b.String()
 }
 
 func (m model) viewIntegration() string {
 	var b strings.Builder
+	aw := appWidth(m.width)
+	inner := aw - 6
+	if inner < 20 {
+		inner = 20
+	}
 	b.WriteString(headerStyle.Render("Values from local runtime config only"))
 	b.WriteString("\n\n")
-	b.WriteString(boxStyle.Render(strings.Join([]string{
+	b.WriteString(boxStyle.Width(inner).Render(strings.Join([]string{
 		fmt.Sprintf("Server URI:   %s", m.cfg.Server.URL),
 		fmt.Sprintf("Base DN:      %s", m.cfg.BaseDN),
 		fmt.Sprintf("Bind DN:      %s", m.cfg.BindDN),
@@ -550,12 +902,19 @@ func (m model) viewIntegration() string {
 	}
 	if m.integ.SelfServiceURL == "" && m.integ.OIDCIssuer == "" && len(m.integ.OnboardingChecklist) == 0 {
 		b.WriteString(mutedStyle.Render("Optional: create ~/.config/ldash/integration.yaml for extra hints."))
+		b.WriteString("\n")
+		b.WriteString(mutedStyle.Render("Press Esc to return to the main menu."))
 	}
 	return b.String()
 }
 
 func (m model) viewSettings() string {
-	return boxStyle.Render(strings.Join([]string{
+	aw := appWidth(m.width)
+	inner := aw - 6
+	if inner < 20 {
+		inner = 20
+	}
+	return boxStyle.Width(inner).Render(strings.Join([]string{
 		"Config profile: single file (MVP)",
 		fmt.Sprintf("Server: %s", m.cfg.Server.URL),
 		fmt.Sprintf("TLS mode: %s", m.cfg.Server.TLSMode),
@@ -629,11 +988,14 @@ func (m model) formLabels() []string {
 	}
 }
 
-func newInput(placeholder string, password bool) textinput.Model {
+func newInput(placeholder string, password bool, width int) textinput.Model {
 	ti := textinput.New()
 	ti.Placeholder = placeholder
 	ti.CharLimit = 128
-	ti.Width = 40
+	if width < 20 {
+		width = 40
+	}
+	ti.Width = width
 	if password {
 		ti.EchoMode = textinput.EchoPassword
 		ti.EchoCharacter = '•'
@@ -642,25 +1004,27 @@ func newInput(placeholder string, password bool) textinput.Model {
 }
 
 func (m *model) initCreateForm() {
+	w := formInputWidth(m.width)
 	m.formInputs = []textinput.Model{
-		newInput("alice", false),
-		newInput("Alice Example", false),
-		newInput("Example", false),
-		newInput("Alice", false),
-		newInput("alice@example.com", false),
-		newInput("initial password", true),
+		newInput("alice", false, w),
+		newInput("Alice Example", false, w),
+		newInput("Example", false, w),
+		newInput("Alice", false, w),
+		newInput("alice@example.com", false, w),
+		newInput("initial password", true, w),
 	}
 	m.formFocus = 0
 	m.formInputs[0].Focus()
 }
 
 func (m *model) initEditForm(u ldapclient.User) {
+	w := formInputWidth(m.width)
 	m.formUID = u.UID
 	m.formDN = u.DN
 	vals := []string{u.CN, u.SN, u.GivenName, u.Mail, u.Gecos, u.LoginShell, u.HomeDirectory}
 	m.formInputs = make([]textinput.Model, len(vals))
 	for i, v := range vals {
-		m.formInputs[i] = newInput("", false)
+		m.formInputs[i] = newInput("", false, w)
 		m.formInputs[i].SetValue(v)
 	}
 	m.formFocus = 0
@@ -668,17 +1032,19 @@ func (m *model) initEditForm(u ldapclient.User) {
 }
 
 func (m *model) initPasswordForm(u ldapclient.User) {
+	w := formInputWidth(m.width)
 	m.formUID = u.UID
 	m.formDN = u.DN
-	m.formInputs = []textinput.Model{newInput("new password", true)}
+	m.formInputs = []textinput.Model{newInput("new password", true, w)}
 	m.formFocus = 0
 	m.formInputs[0].Focus()
 }
 
 func (m *model) initMailForm(u ldapclient.User) {
+	w := formInputWidth(m.width)
 	m.formUID = u.UID
 	m.formDN = u.DN
-	m.formInputs = []textinput.Model{newInput("user@example.com (empty to clear)", false)}
+	m.formInputs = []textinput.Model{newInput("user@example.com (empty to clear)", false, w)}
 	m.formInputs[0].SetValue(u.Mail)
 	m.formFocus = 0
 	m.formInputs[0].Focus()
@@ -843,13 +1209,7 @@ func (m *model) closeClient() {
 }
 
 func trunc(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	if n <= 1 {
-		return s[:n]
-	}
-	return s[:n-1] + "…"
+	return truncRunes(s, n)
 }
 
 func Run(cfg *config.Config, password string) error {

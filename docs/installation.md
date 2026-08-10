@@ -57,6 +57,14 @@ Reference it in config:
 credential_file: "~/.config/ldash/credentials"
 ```
 
+## First run
+
+```bash
+ldash
+```
+
+See the [Terminal UI guide](tui.md) for navigation, keys, and screenshots.
+
 ## File permissions
 
 | Path | Mode | Purpose |
