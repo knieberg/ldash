@@ -179,10 +179,6 @@ func (m model) updateLDIF(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m model) updateLDIFPath(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case keyBack:
-		m.ldifStep = ldifStepHub
-		m.ldifPathInput.Blur()
-		return m, nil
 	case keyEnter:
 		m.ldifPath = strings.TrimSpace(m.ldifPathInput.Value())
 		if m.ldifPath == "" {
@@ -214,7 +210,7 @@ func (m model) updateLDIFPath(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m model) updateLDIFConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case keyBack, "n":
+	case "n":
 		m.ldifStep = ldifStepPath
 		m.confirm = false
 		return m, nil

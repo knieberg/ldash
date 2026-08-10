@@ -101,10 +101,6 @@ func (m model) updateUsersList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m model) updateUserSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case keyBack:
-		m.searching = false
-		m.searchInput.Blur()
-		return m, nil
 	case "ctrl+u":
 		m.searchInput.SetValue("")
 		return m, nil
@@ -115,8 +111,6 @@ func (m model) updateUserSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.busy = true
 		m.setStatus(statusLoading, "Filtering users...")
 		return m, m.ensureConnAnd(m.loadUsersCmd())
-	case "ctrl+c":
-		return m.quit()
 	}
 	var cmd tea.Cmd
 	m.searchInput, cmd = m.searchInput.Update(msg)

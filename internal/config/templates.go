@@ -261,20 +261,32 @@ func LoadGroupTemplate(cfg *Config) (*GroupTemplate, error) {
 	return &tpl, nil
 }
 
+// InitResult reports what InitFromEmbedded wrote.
+type InitResult struct {
+	ConfigPath string
+	Added      []string // paths relative to config dir
+}
+
 // InitFromEmbedded writes embedded config and templates into the user config directory.
-func InitFromEmbedded() (string, error) {
+// If config.yaml already exists it is left unchanged; missing template files are still added (SkipIf files are never overwritten).
+func InitFromEmbedded() (InitResult, error) {
 	cfgDir, err := DefaultConfigDir()
 	if err != nil {
-		return "", err
+		return InitResult{}, err
 	}
 	if err := os.MkdirAll(cfgDir, 0o700); err != nil {
-		return "", fmt.Errorf("create config dir: %w", err)
+		return InitResult{}, fmt.Errorf("create config dir: %w", err)
 	}
 	dest := filepath.Join(cfgDir, ConfigFile)
+	configExists := false
 	if _, err := os.Stat(dest); err == nil {
-		return dest, fmt.Errorf("config already exists at %s", dest)
+		configExists = true
 	}
+	var added []string
 	for _, f := range embedassets.InitFiles() {
+		if configExists && f.Name == ConfigFile {
+			continue
+		}
 		target := filepath.Join(cfgDir, f.Name)
 		if f.SkipIf {
 			if _, err := os.Stat(target); err == nil {
@@ -282,13 +294,17 @@ func InitFromEmbedded() (string, error) {
 			}
 		}
 		if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
-			return "", fmt.Errorf("create dir for %s: %w", f.Name, err)
+			return InitResult{ConfigPath: dest}, fmt.Errorf("create dir for %s: %w", f.Name, err)
 		}
 		if err := os.WriteFile(target, f.Content, os.FileMode(f.Mode)); err != nil {
-			return "", fmt.Errorf("write %s: %w", f.Name, err)
+			return InitResult{ConfigPath: dest}, fmt.Errorf("write %s: %w", f.Name, err)
 		}
+		added = append(added, f.Name)
 	}
-	return dest, nil
+	if configExists && len(added) == 0 {
+		return InitResult{ConfigPath: dest}, fmt.Errorf("config already exists at %s", dest)
+	}
+	return InitResult{ConfigPath: dest, Added: added}, nil
 }
 
 // InitFromExample copies example files from disk paths (development fallback).

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -52,7 +53,7 @@ func newConfigCmd() *cobra.Command {
 		Use:   "init",
 		Short: "Initialize user config from config.example.yaml",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			dest, err := config.InitFromEmbedded()
+			res, err := config.InitFromEmbedded()
 			if err != nil {
 				example, err2 := findExampleConfig()
 				if err2 != nil {
@@ -62,12 +63,25 @@ func newConfigCmd() *cobra.Command {
 				if err3 != nil {
 					return err
 				}
-				dest, err = config.InitFromExample(example, tplExample)
+				dest, err := config.InitFromExample(example, tplExample)
 				if err != nil {
 					return err
 				}
+				fmt.Printf("Created config at %s\n", dest)
+				fmt.Println("Templates: ~/.config/ldash/templates/")
+				fmt.Println("Edit the files, then run: ldash")
+				return nil
 			}
-			fmt.Printf("Created config at %s\n", dest)
+			createdNew := slices.Contains(res.Added, config.ConfigFile)
+			if createdNew {
+				fmt.Printf("Created config at %s\n", res.ConfigPath)
+			} else {
+				fmt.Printf("Config at %s\n", res.ConfigPath)
+				fmt.Println("Added missing files:")
+			}
+			for _, name := range res.Added {
+				fmt.Printf("  %s\n", name)
+			}
 			fmt.Println("Templates: ~/.config/ldash/templates/")
 			fmt.Println("Edit the files, then run: ldash")
 			return nil

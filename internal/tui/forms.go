@@ -108,11 +108,12 @@ func attrValue(u ldapclient.User, extra map[string]string, attr string) string {
 	return ""
 }
 
-func (m *model) initGroupCreateForm() {
+func (m *model) initGroupCreateForm() error {
 	tpl, err := config.LoadGroupTemplate(m.cfg)
 	if err != nil {
 		m.formSpecs = nil
-		return
+		m.formInputs = nil
+		return err
 	}
 	m.formSpecs = tpl.AllFormFields()
 	m.formTemplateName = tpl.Name
@@ -130,32 +131,42 @@ func (m *model) initGroupCreateForm() {
 		m.formInputs[i] = newInput(ph, false, w)
 	}
 	m.formFocus = 0
-	m.formInputs[0].Focus()
+	if len(m.formInputs) > 0 {
+		m.formInputs[0].Focus()
+	}
+	return nil
 }
 
-func (m *model) initGroupEditForm(g ldapclient.Group) {
-	tpl, _ := config.LoadGroupTemplate(m.cfg)
-	if tpl != nil {
-		m.formSpecs = tpl.AllFormFields()
-		// only description + custom on edit
-		m.formSpecs = []config.FormFieldSpec{{Attr: "description", Required: false}}
+func (m *model) initGroupEditForm(g ldapclient.Group) error {
+	tpl, err := config.LoadGroupTemplate(m.cfg)
+	m.formSpecs = []config.FormFieldSpec{{Attr: "description", Required: false}}
+	if err != nil {
+		m.formTemplateName = ""
+		m.formTemplateDesc = ""
+	} else {
+		m.formTemplateName = tpl.Name
+		m.formTemplateDesc = tpl.Description
 		for _, c := range tpl.CustomAttributes {
 			m.formSpecs = append(m.formSpecs, config.FormFieldSpec{
 				Attr: c.Name, Required: c.Required, Custom: true, Label: c.Label, Help: c.Help,
 			})
 		}
 	}
-	m.formTemplateName = tpl.Name
 	w := formInputWidth(m.width)
 	m.formInputs = make([]textinput.Model, len(m.formSpecs))
 	for i, spec := range m.formSpecs {
 		m.formInputs[i] = newInput("", false, w)
 		if spec.Attr == "description" {
 			m.formInputs[i].SetValue(g.Description)
+		} else if g.Extra != nil {
+			m.formInputs[i].SetValue(g.Extra[spec.Attr])
 		}
 	}
 	m.formFocus = 0
-	m.formInputs[0].Focus()
+	if len(m.formInputs) > 0 {
+		m.formInputs[0].Focus()
+	}
+	return err
 }
 
 func (m model) viewTemplateForm(title string) string {

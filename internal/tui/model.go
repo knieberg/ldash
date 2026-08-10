@@ -388,6 +388,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+		switch msg.String() {
+		case keyBack:
+			return m.goBack()
+		case keyHelp:
+			m.showHelp = true
+			return m, nil
+		case "ctrl+c":
+			return m.quit()
+		}
 		if m.searching && m.current == viewUsers {
 			return m.updateUserSearch(msg)
 		}
@@ -396,6 +405,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.ldifStep == ldifStepPath && m.current == viewLDIF {
 			return m.updateLDIFPath(msg)
+		}
+		if m.current == viewGroupMemberAdd {
+			return m.updateGroupMemberAdd(msg)
 		}
 		if m.isFormView() {
 			return m.updateForm(msg)
@@ -409,9 +421,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.current == viewGroupMembers {
 			return m.updateGroupMembers(msg)
 		}
-		if m.current == viewGroupMemberAdd {
-			return m.updateGroupMemberAdd(msg)
-		}
 		if m.current == viewSambaUser {
 			return m.updateSambaUser(msg)
 		}
@@ -424,7 +433,7 @@ func (m model) isFormView() bool {
 	return m.current == viewUserCreate || m.current == viewUserEdit ||
 		m.current == viewUserPassword || m.current == viewUserMail ||
 		m.current == viewGroupCreate || m.current == viewGroupEdit ||
-		m.current == viewSambaFlags || m.current == viewGroupMemberAdd
+		m.current == viewSambaFlags
 }
 
 func (m model) isUserChild() bool {
@@ -485,7 +494,11 @@ func (m model) goBack() (tea.Model, tea.Cmd) {
 	}
 	if m.current == viewLDIF {
 		switch m.ldifStep {
-		case ldifStepSummary, ldifStepConfirm:
+		case ldifStepConfirm:
+			m.ldifStep = ldifStepPath
+			m.confirm = false
+			return m, nil
+		case ldifStepSummary:
 			m.ldifStep = ldifStepHub
 			m.confirm = false
 			return m, nil
@@ -510,19 +523,12 @@ func (m model) goBack() (tea.Model, tea.Cmd) {
 
 func (m model) updateNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+c":
-		return m.quit()
-	case keyHelp:
-		m.showHelp = true
-		return m, nil
 	case keyQuit:
 		if m.current == viewMenu {
 			return m.quit()
 		}
 		// q is not back on other views
 		return m, nil
-	case keyBack:
-		return m.goBack()
 	}
 
 	switch m.current {
@@ -596,13 +602,6 @@ func (m model) openMenuItem(idx int) (tea.Model, tea.Cmd) {
 }
 func (m model) updateForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case keyBack:
-		return m.goBack()
-	case keyHelp:
-		m.showHelp = true
-		return m, nil
-	case "ctrl+c":
-		return m.quit()
 	case "tab", "down":
 		m.formFocus = (m.formFocus + 1) % len(m.formInputs)
 		return m, m.focusForm()
@@ -621,13 +620,8 @@ func (m model) updateForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m model) updateDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case keyBack, "n":
+	case "n":
 		return m.goBack()
-	case keyHelp:
-		m.showHelp = true
-		return m, nil
-	case "ctrl+c":
-		return m.quit()
 	case "y":
 		if !m.confirm {
 			m.confirm = true
@@ -817,7 +811,7 @@ func (m model) helpViewKeys() string {
 	case viewUserDelete, viewGroupDelete:
 		return helpLines([]keyAction{{"y", "confirm (twice)"}, {"n", "cancel"}})
 	case viewGroupMembers:
-		return helpLines([]keyAction{{keyCreate, "add member"}, {keyDelete, "remove"}, {keyUp + "/" + keyDown, "move"}})
+		return helpLines([]keyAction{{keyCreate, "add member"}, {keyDelete, "remove"}, {keyUp + "/" + keyDown, "move"}, {keyBack, "back"}})
 	default:
 		return helpLines([]keyAction{{keyBack, "back"}})
 	}

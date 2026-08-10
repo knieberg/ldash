@@ -1,12 +1,14 @@
 package tui
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/knieberg/ldash/internal/config"
+	ldapclient "github.com/knieberg/ldash/internal/ldap"
 )
 
 func testModel() model {
@@ -151,6 +153,149 @@ func TestViewUsesShell(t *testing.T) {
 	}
 	if !strings.Contains(out, "Navigate") {
 		t.Fatal("missing menu panel")
+	}
+}
+
+func TestGroupEditFormMissingTemplateNoPanic(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	m := testModel()
+	m.cfg.TemplatesDir = filepath.Join(home, "no-templates")
+	g := ldapclient.Group{CN: "devs", Description: "Developers team"}
+	err := m.initGroupEditForm(g)
+	if err == nil {
+		t.Fatal("expected error when group template is missing")
+	}
+	if len(m.formInputs) == 0 {
+		t.Fatal("expected at least description field")
+	}
+	if m.formInputs[0].Value() != "Developers team" {
+		t.Fatalf("description not prefilled: %q", m.formInputs[0].Value())
+	}
+}
+
+func TestGroupCreateFormMissingTemplateReturnsError(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	m := testModel()
+	m.cfg.TemplatesDir = filepath.Join(home, "no-templates")
+	err := m.initGroupCreateForm()
+	if err == nil {
+		t.Fatal("expected error when group template is missing")
+	}
+	if m.formInputs != nil {
+		t.Fatal("form inputs should stay nil when template load fails")
+	}
+}
+
+func escKey() tea.KeyMsg {
+	return tea.KeyMsg{Type: tea.KeyEscape}
+}
+
+func TestEscBackNavigation(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(*model)
+		wantView viewID
+	}{
+		{
+			name: "group members to groups list",
+			setup: func(m *model) {
+				m.current = viewGroupMembers
+				m.formUID = "devs"
+			},
+			wantView: viewGroups,
+		},
+		{
+			name: "group member add to members",
+			setup: func(m *model) {
+				m.current = viewGroupMemberAdd
+				m.formUID = "devs"
+			},
+			wantView: viewGroupMembers,
+		},
+		{
+			name: "samba user to users list",
+			setup: func(m *model) {
+				m.current = viewSambaUser
+			},
+			wantView: viewUsers,
+		},
+		{
+			name: "user edit to users list",
+			setup: func(m *model) {
+				m.current = viewUserEdit
+			},
+			wantView: viewUsers,
+		},
+		{
+			name: "dashboard to menu",
+			setup: func(m *model) {
+				m.current = viewDashboard
+			},
+			wantView: viewMenu,
+		},
+		{
+			name: "ldif hub to menu",
+			setup: func(m *model) {
+				m.current = viewLDIF
+				m.ldifStep = ldifStepHub
+			},
+			wantView: viewMenu,
+		},
+		{
+			name: "ldif path to hub",
+			setup: func(m *model) {
+				m.current = viewLDIF
+				m.ldifStep = ldifStepPath
+			},
+			wantView: viewLDIF,
+		},
+		{
+			name: "ldif confirm to path",
+			setup: func(m *model) {
+				m.current = viewLDIF
+				m.ldifStep = ldifStepConfirm
+				m.confirm = true
+			},
+			wantView: viewLDIF,
+		},
+		{
+			name: "user search cancel stays on users",
+			setup: func(m *model) {
+				m.current = viewUsers
+				m.searching = true
+			},
+			wantView: viewUsers,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			m := testModel()
+			tc.setup(&m)
+			m2, _ := m.Update(escKey())
+			mm := m2.(model)
+			if mm.current != tc.wantView {
+				t.Fatalf("Esc: got view %v want %v", mm.current, tc.wantView)
+			}
+			switch tc.name {
+			case "ldif path to hub":
+				if mm.ldifStep != ldifStepHub {
+					t.Fatalf("ldif step: got %d want hub", mm.ldifStep)
+				}
+			case "ldif confirm to path":
+				if mm.ldifStep != ldifStepPath {
+					t.Fatalf("ldif step: got %d want path", mm.ldifStep)
+				}
+				if mm.confirm {
+					t.Fatal("confirm should be cleared")
+				}
+			case "user search cancel stays on users":
+				if mm.searching {
+					t.Fatal("search mode should be cancelled")
+				}
+			}
+		})
 	}
 }
 

@@ -46,12 +46,17 @@ func (m model) updateGroupsList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.groupSearchInput.Focus()
 		return m, textinput.Blink
 	case keyCreate:
-		m.initGroupCreateForm()
+		if err := m.initGroupCreateForm(); err != nil {
+			m.setStatus(statusError, err.Error())
+			return m, nil
+		}
 		m.current = viewGroupCreate
 		return m, textinput.Blink
 	case keyEdit:
 		if g := m.selectedGroup(); g != nil {
-			m.initGroupEditForm(*g)
+			if err := m.initGroupEditForm(*g); err != nil {
+				m.setStatus(statusWarn, "Group template not loaded; editing description only")
+			}
 			m.current = viewGroupEdit
 			return m, textinput.Blink
 		}
@@ -147,10 +152,6 @@ func (m model) loadGroupsFullCmd() tea.Cmd {
 
 func (m model) updateGroupSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case keyBack:
-		m.groupSearching = false
-		m.groupSearchInput.Blur()
-		return m, nil
 	case keyEnter:
 		m.groupFilter = m.groupSearchInput.Value()
 		m.groupSearching = false
@@ -196,9 +197,6 @@ func (m *model) initMemberAddForm() {
 
 func (m model) updateGroupMemberAdd(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case keyBack:
-		m.current = viewGroupMembers
-		return m, nil
 	case keyEnter:
 		uid := strings.TrimSpace(m.formInputs[0].Value())
 		if uid == "" {
