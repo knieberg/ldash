@@ -67,8 +67,8 @@ func (m model) viewLDIF() string {
 		var b strings.Builder
 		b.WriteString(warnStyle.Render("Import LDIF?"))
 		b.WriteString("\n\n")
-		b.WriteString(fmt.Sprintf("File: %s\n", m.ldifPath))
-		b.WriteString(fmt.Sprintf("Entries: %d\n\n", m.ldifPreview))
+		fmt.Fprintf(&b, "File: %s\n", m.ldifPath)
+		fmt.Fprintf(&b, "Entries: %d\n\n", m.ldifPreview)
 		if m.confirm {
 			b.WriteString(errStyle.Render("Final confirmation: press y to apply changes."))
 		} else {

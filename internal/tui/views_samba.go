@@ -25,7 +25,7 @@ func (m model) viewSambaHub() string {
 	b.WriteString("Core attributes:\n")
 	for _, attr := range []string{"sambaSID", "sambaAcctFlags", "sambaNTPassword"} {
 		label, help := sambaFieldHelp(attr)
-		b.WriteString(fmt.Sprintf("  %s — %s\n", label, help))
+		fmt.Fprintf(&b, "  %s — %s\n", label, help)
 	}
 	b.WriteString("\n")
 	if !hasSambaOC || m.cfg.Samba.DomainSID == "" {

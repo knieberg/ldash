@@ -11,16 +11,6 @@ import (
 	ldapclient "github.com/knieberg/ldash/internal/ldap"
 )
 
-var builtinUserAttrs = map[string]bool{
-	"uid": true, "cn": true, "sn": true, "givenname": true, "mail": true,
-	"password": true, "gecos": true, "loginshell": true, "homedirectory": true,
-	"uidnumber": true, "gidnumber": true,
-}
-
-var builtinGroupAttrs = map[string]bool{
-	"cn": true, "gidnumber": true, "description": true,
-}
-
 func splitUserValues(specs []config.FormFieldSpec, vals map[string]string) (ldapclient.CreateUserInput, []string, error) {
 	in := ldapclient.CreateUserInput{Extra: map[string]string{}}
 	var clear []string
