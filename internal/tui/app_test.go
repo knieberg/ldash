@@ -61,11 +61,72 @@ func TestHelpClosesFirst(t *testing.T) {
 
 func TestGroupsMenuNavigates(t *testing.T) {
 	m := testModel()
-	m.menuCursor = 2 // Groups
-	m2, _ := m.openMenuItem(2)
+	m2, _ := m.openMenuItem(2) // Groups
 	mm := m2.(model)
 	if mm.current != viewGroups {
 		t.Fatalf("groups item should open viewGroups, got %v", mm.current)
+	}
+}
+
+func TestLDIFMenuNavigates(t *testing.T) {
+	m := testModel()
+	m2, _ := m.openMenuItem(3) // LDIF
+	mm := m2.(model)
+	if mm.current != viewLDIF {
+		t.Fatalf("LDIF item should open viewLDIF, got %v", mm.current)
+	}
+	if mm.ldifStep != ldifStepHub {
+		t.Fatalf("LDIF should start at hub, got step %d", mm.ldifStep)
+	}
+}
+
+func TestSambaMenuNavigates(t *testing.T) {
+	m := testModel()
+	m2, _ := m.openMenuItem(4) // Samba
+	mm := m2.(model)
+	if mm.current != viewSamba {
+		t.Fatalf("Samba item should open viewSamba, got %v", mm.current)
+	}
+}
+
+func TestFooterUsersLabeledKeys(t *testing.T) {
+	m := testModel()
+	m.current = viewUsers
+	footer := m.footerKeys()
+	for _, verb := range []string{"create", "edit", "delete", "password", "mail", "samba", "search", "refresh"} {
+		if !strings.Contains(footer, verb) {
+			t.Fatalf("footer missing labeled action %q: %q", verb, footer)
+		}
+	}
+	if strings.Contains(footer, "c e d") {
+		t.Fatalf("footer must not show bare key chains: %q", footer)
+	}
+}
+
+func TestDisplayLabelShowsRequired(t *testing.T) {
+	spec := config.FormFieldSpec{Attr: "uid", Required: true}
+	label := displayLabel(spec)
+	if !strings.Contains(label, "(required)") {
+		t.Fatalf("expected required marker, got %q", label)
+	}
+	if !strings.Contains(label, "uid") {
+		t.Fatalf("expected attr in label, got %q", label)
+	}
+}
+
+func TestMenuHasSevenItems(t *testing.T) {
+	m := testModel()
+	if len(m.menuItems) != 7 {
+		t.Fatalf("expected 7 menu items, got %d", len(m.menuItems))
+	}
+}
+
+func TestEmptyUsersFilterMessage(t *testing.T) {
+	m := testModel()
+	m.userFilter = "nobody"
+	out := m.viewUsers()
+	if !strings.Contains(out, "No matches") {
+		t.Fatalf("filtered empty list should say No matches: %q", out)
 	}
 }
 

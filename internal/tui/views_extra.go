@@ -131,6 +131,12 @@ func (m model) viewGroupsList() string {
 		b.WriteString("\n")
 	}
 	if len(m.groupsFull) == 0 {
+		if m.groupFilter != "" {
+			b.WriteString(mutedStyle.Render("No matches for the current filter."))
+			b.WriteString("\n")
+			b.WriteString(mutedStyle.Render("Press / search to change filter · Esc back · r refresh"))
+			return b.String()
+		}
 		b.WriteString(mutedStyle.Render("No groups found."))
 		b.WriteString("\n")
 		b.WriteString(mutedStyle.Render("Press c create · / search · r refresh"))
@@ -283,7 +289,9 @@ func (m model) viewLDIF() string {
 		} else if m.ldifExportCount > 0 {
 			fmt.Fprintf(&b, "Exported %d entries to %s\n", m.ldifExportCount, m.ldifPath)
 		} else {
-			b.WriteString(mutedStyle.Render("No entries applied."))
+			b.WriteString(mutedStyle.Render("No entries applied or exported."))
+			b.WriteString("\n")
+			b.WriteString(mutedStyle.Render("Check skipped/failed counts above or try another file/scope."))
 		}
 		b.WriteString("\n")
 		b.WriteString(mutedStyle.Render("Press Esc to return to LDIF menu."))

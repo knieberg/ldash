@@ -1126,6 +1126,12 @@ func (m model) viewUsers() string {
 	}
 
 	if len(m.users) == 0 {
+		if m.userFilter != "" {
+			b.WriteString(mutedStyle.Render("No matches for the current filter."))
+			b.WriteString("\n")
+			b.WriteString(mutedStyle.Render("Press / search to change filter · Esc back · r refresh"))
+			return b.String()
+		}
 		b.WriteString(mutedStyle.Render("No users found."))
 		b.WriteString("\n")
 		b.WriteString(mutedStyle.Render("Press r refresh · c create · / search"))
