@@ -45,11 +45,11 @@ func (m model) viewSambaUser() string {
 	b.WriteString(headerStyle.Render("Samba status: " + u.UID))
 	b.WriteString("\n\n")
 	sidLabel, sidHelp := sambaFieldHelp("sambaSID")
-	b.WriteString(fmt.Sprintf("%s: %s\n", sidLabel, sambaPresent(u.SambaSID)))
+	fmt.Fprintf(&b, "%s: %s\n", sidLabel, sambaPresent(u.SambaSID))
 	b.WriteString(mutedStyle.Render("  "+sidHelp))
 	b.WriteString("\n")
 	flagLabel, flagHelp := sambaFieldHelp("sambaAcctFlags")
-	b.WriteString(fmt.Sprintf("%s: %s\n", flagLabel, sambaPresent(u.SambaFlags)))
+	fmt.Fprintf(&b, "%s: %s\n", flagLabel, sambaPresent(u.SambaFlags))
 	b.WriteString(mutedStyle.Render("  "+flagHelp))
 	b.WriteString("\n")
 	ntLabel, ntHelp := sambaFieldHelp("sambaNTPassword")
@@ -57,7 +57,7 @@ func (m model) viewSambaUser() string {
 	if m.sambaNTPresent {
 		nt = "Present"
 	}
-	b.WriteString(fmt.Sprintf("%s: %s\n", ntLabel, nt))
+	fmt.Fprintf(&b, "%s: %s\n", ntLabel, nt)
 	b.WriteString(mutedStyle.Render("  "+ntHelp))
 	b.WriteString("\n\n")
 	b.WriteString(mutedStyle.Render("Press e edit flags · Esc back"))
