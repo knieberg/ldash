@@ -149,7 +149,9 @@ type CreateUserInput struct {
 	Gecos         string
 	UIDNumber     int
 	GIDNumber     int
+	Extra         map[string]string
 	Template      *config.UserTemplate
+	GroupTemplate *config.GroupTemplate
 }
 
 // CreateUser adds a user (and optional primary group) from the template.
@@ -212,18 +214,14 @@ func (c *Client) CreateUser(in CreateUserInput) error {
 	groupDN := fmt.Sprintf("cn=%s,%s", ldap.EscapeDN(in.UID), c.cfg.GroupsDN())
 	createdGroup := false
 	if in.Template.CreatePrimaryGroup {
-		g := ldap.NewAddRequest(groupDN, nil)
-		g.Attribute("objectClass", []string{"top", "posixGroup"})
-		g.Attribute("cn", []string{in.UID})
-		g.Attribute("gidNumber", []string{strconv.Itoa(in.GIDNumber)})
-		g.Attribute("memberUid", []string{in.UID})
-		if err := c.conn.Add(g); err != nil {
-			if !ldap.IsErrorWithCode(err, ldap.LDAPResultEntryAlreadyExists) {
-				return fmt.Errorf("create primary group: %w", err)
-			}
-		} else {
-			createdGroup = true
+		gtpl := in.GroupTemplate
+		if gtpl == nil {
+			return fmt.Errorf("group template is required when create_primary_group is true")
 		}
+		if _, err := c.CreatePrimaryGroup(in.UID, in.GIDNumber, gtpl); err != nil {
+			return err
+		}
+		createdGroup = true
 	}
 
 	dn := fmt.Sprintf("uid=%s,%s", ldap.EscapeDN(in.UID), c.cfg.PeopleDN())
@@ -245,6 +243,11 @@ func (c *Client) CreateUser(in CreateUserInput) error {
 	}
 	if in.Mail != "" {
 		req.Attribute("mail", []string{in.Mail})
+	}
+	for k, v := range in.Extra {
+		if strings.TrimSpace(v) != "" {
+			req.Attribute(k, []string{v})
+		}
 	}
 	if needSamba {
 		req.Attribute("sambaSID", []string{sambaSID})
@@ -297,6 +300,8 @@ type UpdateUserInput struct {
 	Gecos         string
 	LoginShell    string
 	HomeDirectory string
+	Extra         map[string]string
+	ClearExtra    []string
 }
 
 // UpdateUser replaces common attributes on an existing entry.
@@ -331,6 +336,16 @@ func (c *Client) UpdateUser(in UpdateUserInput) error {
 	}
 	if in.HomeDirectory != "" {
 		mod.Replace("homeDirectory", []string{in.HomeDirectory})
+	}
+	for _, attr := range in.ClearExtra {
+		mod.Delete(attr, nil)
+	}
+	for k, v := range in.Extra {
+		if strings.TrimSpace(v) == "" {
+			mod.Delete(k, nil)
+		} else {
+			mod.Replace(k, []string{v})
+		}
 	}
 	if err := c.conn.Modify(mod); err != nil {
 		return fmt.Errorf("modify user: %w", err)
@@ -398,15 +413,94 @@ func (c *Client) GroupsForUser(uid, userDN string) ([]GroupRef, error) {
 	return out, nil
 }
 
-// DeleteUser removes a user entry. It does not remove groups.
-func (c *Client) DeleteUser(dn string) error {
+// DeleteUser removes a user entry and cleans up group memberships.
+func (c *Client) DeleteUser(uid, dn string) (int, error) {
+	if err := c.requireBound(); err != nil {
+		return 0, err
+	}
+	removed := 0
+	groups, err := c.GroupsForUser(uid, dn)
+	if err != nil {
+		return 0, err
+	}
+	for _, g := range groups {
+		mod := ldap.NewModifyRequest(g.DN, nil)
+		if g.Attr == "memberUid" {
+			mod.Delete("memberUid", []string{uid})
+		} else {
+			mod.Delete("member", []string{dn})
+		}
+		if err := c.conn.Modify(mod); err != nil {
+			return removed, fmt.Errorf("remove membership from %s: %w", g.CN, err)
+		}
+		removed++
+	}
+	primaryDN := fmt.Sprintf("cn=%s,%s", ldap.EscapeDN(uid), c.cfg.GroupsDN())
+	if g, err := c.GetGroup(uid); err == nil && g.MemberCount <= 1 {
+		if err := c.conn.Del(ldap.NewDelRequest(primaryDN, nil)); err != nil && !ldap.IsErrorWithCode(err, ldap.LDAPResultNoSuchObject) {
+			return removed, fmt.Errorf("delete primary group: %w", err)
+		}
+	}
+	if err := c.conn.Del(ldap.NewDelRequest(dn, nil)); err != nil {
+		return removed, fmt.Errorf("delete user: %w", err)
+	}
+	return removed, nil
+}
+
+// SetSambaFlags updates sambaAcctFlags on a user entry.
+func (c *Client) SetSambaFlags(dn, flags string) error {
 	if err := c.requireBound(); err != nil {
 		return err
 	}
-	if err := c.conn.Del(ldap.NewDelRequest(dn, nil)); err != nil {
-		return fmt.Errorf("delete user: %w", err)
+	if !strings.HasPrefix(flags, "[") || !strings.HasSuffix(flags, "]") {
+		return fmt.Errorf("sambaAcctFlags must look like [U          ]")
+	}
+	mod := ldap.NewModifyRequest(dn, nil)
+	mod.Replace("sambaAcctFlags", []string{flags})
+	if err := c.conn.Modify(mod); err != nil {
+		return fmt.Errorf("set sambaAcctFlags: %w", err)
 	}
 	return nil
+}
+
+// HasSambaPassword reports whether sambaNTPassword is present (without reading the hash).
+func (c *Client) HasSambaPassword(dn string) (bool, error) {
+	if err := c.requireBound(); err != nil {
+		return false, err
+	}
+	req := ldap.NewSearchRequest(dn, ldap.ScopeBaseObject, ldap.NeverDerefAliases, 1, 0, false, "(objectClass=*)", []string{"sambaNTPassword"}, nil)
+	res, err := c.conn.Search(req)
+	if err != nil {
+		return false, err
+	}
+	if len(res.Entries) == 0 {
+		return false, nil
+	}
+	return res.Entries[0].GetAttributeValue("sambaNTPassword") != "", nil
+}
+
+// GetEntryAttrs reads attribute values from a single LDAP entry.
+func (c *Client) GetEntryAttrs(dn string, attrs []string) (map[string]string, error) {
+	if err := c.requireBound(); err != nil {
+		return nil, err
+	}
+	if len(attrs) == 0 {
+		return map[string]string{}, nil
+	}
+	req := ldap.NewSearchRequest(dn, ldap.ScopeBaseObject, ldap.NeverDerefAliases, 1, 0, false, "(objectClass=*)", attrs, nil)
+	res, err := c.conn.Search(req)
+	if err != nil {
+		return nil, fmt.Errorf("read entry attrs: %w", err)
+	}
+	if len(res.Entries) == 0 {
+		return nil, fmt.Errorf("entry not found")
+	}
+	e := res.Entries[0]
+	out := make(map[string]string, len(attrs))
+	for _, a := range attrs {
+		out[a] = e.GetAttributeValue(a)
+	}
+	return out, nil
 }
 
 func (c *Client) requireBound() error {

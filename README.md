@@ -5,7 +5,7 @@
 
 **Terminal UI for OpenLDAP administration**
 
-ldash is a terminal user interface (TUI) for managing users, groups, passwords, mail attributes, Samba-related LDAP fields, and integration hints for connecting LDAP to other services.
+ldash is a terminal user interface (TUI) for managing users, groups, passwords, mail attributes, Samba-related LDAP fields, LDIF backup/restore, and integration hints for connecting LDAP to other services.
 
 > [!WARNING]
 > Always back up your LDAP directory (for example via LDIF export) before bulk changes.
@@ -25,17 +25,18 @@ ldash is a terminal user interface (TUI) for managing users, groups, passwords, 
 | --- | --- |
 | Connection profiles (plain / StartTLS / LDAPS) | MVP |
 | Dashboard & connection test | MVP |
-| Main menu navigation | MVP |
+| Main menu navigation (1–7) | MVP |
 | User list / search | MVP |
-| User create / edit / delete | MVP |
+| User create / edit / delete (template-driven) | MVP |
 | Admin password reset | MVP |
 | Email (`mail`) management | MVP |
+| Custom attributes (template YAML) | MVP |
+| Group list / CRUD / members (template-driven) | MVP |
+| LDIF export / import (TUI) | MVP |
+| Samba status hub + per-user flags edit | MVP |
 | Samba SID on user create | MVP |
 | Integration guide (from local config) | MVP |
-| Custom attributes | Planned |
-| Samba attribute status view | Planned |
-| Group membership | v0.2 |
-| LDIF import / export | v0.2 |
+| Embedded `config init` for installed binaries | MVP |
 
 ## Quick start
 
@@ -75,12 +76,10 @@ Example values in the repository always use **`dc=example,dc=com`** and **`ldap.
 | `q` | Quit (main menu only) |
 | `Ctrl+C` | Quit anytime |
 | `?` | Help overlay |
-| `1`–`6` | Open main menu item |
+| `1`–`7` | Open main menu item |
 | `r` | Refresh / test connection |
-| `j` / `k` | Move |
-| `PgUp` / `PgDn` | Page users list |
-| `/` | Filter users |
-| `c` `e` `d` `p` `m` | Create / edit / delete / password / mail |
+
+Footer and help show **labeled** actions (for example `c create`, `e edit`) instead of bare letters.
 
 Full key reference and screenshots: [Terminal UI guide](./docs/tui.md).
 
@@ -100,7 +99,9 @@ Runtime configuration lives in **`~/.config/ldash/`** (never committed):
 ├── credentials          # optional, mode 0600
 ├── integration.yaml     # optional OIDC / self-service hints
 └── templates/
-    └── user_samba_posix.yaml
+    ├── user_samba_posix.yaml   # active user template
+    ├── group_posix.yaml        # active group template
+    └── *.example.yaml          # reference copies from config init
 ```
 
 See [configuration.md](./docs/configuration.md).
@@ -110,6 +111,7 @@ See [configuration.md](./docs/configuration.md).
 - Do not commit credentials or environment-specific LDAP data.
 - Keep `~/.config/ldash/` at mode `0700` and credential files at `0600`.
 - ldash does not require root; it needs LDAP admin bind privileges only.
+- LDIF export redacts password hashes; import skips password attributes (same policy as user create).
 
 ## License
 
@@ -117,4 +119,4 @@ This project is licensed under the [GNU General Public License v3.0](LICENSE).
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md). Bug reports and pull requests are welcome.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and pull requests are welcome.

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -52,20 +53,36 @@ func newConfigCmd() *cobra.Command {
 		Use:   "init",
 		Short: "Initialize user config from config.example.yaml",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			example, err := findExampleConfig()
+			res, err := config.InitFromEmbedded()
 			if err != nil {
-				return err
+				example, err2 := findExampleConfig()
+				if err2 != nil {
+					return err
+				}
+				tplExample, err3 := findExampleTemplate()
+				if err3 != nil {
+					return err
+				}
+				dest, err := config.InitFromExample(example, tplExample)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("Created config at %s\n", dest)
+				fmt.Println("Templates: ~/.config/ldash/templates/")
+				fmt.Println("Edit the files, then run: ldash")
+				return nil
 			}
-			tplExample, err := findExampleTemplate()
-			if err != nil {
-				return err
+			createdNew := slices.Contains(res.Added, config.ConfigFile)
+			if createdNew {
+				fmt.Printf("Created config at %s\n", res.ConfigPath)
+			} else {
+				fmt.Printf("Config at %s\n", res.ConfigPath)
+				fmt.Println("Added missing files:")
 			}
-			dest, err := config.InitFromExample(example, tplExample)
-			if err != nil {
-				return err
+			for _, name := range res.Added {
+				fmt.Printf("  %s\n", name)
 			}
-			fmt.Printf("Created config at %s\n", dest)
-			fmt.Println("User template: ~/.config/ldash/templates/user_samba_posix.yaml")
+			fmt.Println("Templates: ~/.config/ldash/templates/")
 			fmt.Println("Edit the files, then run: ldash")
 			return nil
 		},

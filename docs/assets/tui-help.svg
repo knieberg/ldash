@@ -16,7 +16,7 @@
   <text x="160" y="196" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#E2E8F0">  q       quit (main menu only)</text>
   <text x="160" y="214" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#E2E8F0">  Ctrl+C  quit anytime</text>
   <text x="160" y="232" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#E2E8F0">  ?       toggle this help</text>
-  <text x="160" y="250" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#E2E8F0">  1-6     open main menu item</text>
+  <text x="160" y="250" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#E2E8F0">  1-7     open main menu item</text>
   <text x="160" y="278" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" font-weight="700" fill="#67E8F9">This view</text>
   <text x="160" y="300" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#E2E8F0">  j/k | PgUp/PgDn | / search | c e d p m | r</text>
   <text x="160" y="322" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#94A3B8">Press Esc or ? to close</text>

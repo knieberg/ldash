@@ -1,0 +1,18 @@
+# Reference template — copy to ~/.config/ldash/templates/group_of_names.yaml
+name: group_of_names
+description: groupOfNames with member DN references (example)
+
+object_classes:
+  - groupOfNames
+
+member_attribute: member
+
+defaults: {}
+
+required_attributes:
+  - cn
+
+optional_attributes:
+  - description
+
+custom_attributes: []
