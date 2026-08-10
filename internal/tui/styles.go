@@ -123,7 +123,6 @@ func renderFooterBar(keys, status string, width int) string {
 	right := status
 	gap := width - lipgloss.Width(left) - lipgloss.Width(right) - 2
 	if gap < 1 {
-		gap = 1
 		// Prefer keys; truncate status if needed.
 		maxRight := width - lipgloss.Width(left) - 3
 		if maxRight < 8 {

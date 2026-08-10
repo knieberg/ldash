@@ -1208,10 +1208,6 @@ func (m *model) closeClient() {
 	}
 }
 
-func trunc(s string, n int) string {
-	return truncRunes(s, n)
-}
-
 func Run(cfg *config.Config, password string) error {
 	integ, err := config.LoadIntegration()
 	if err != nil {

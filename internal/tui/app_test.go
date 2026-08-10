@@ -97,11 +97,12 @@ func TestViewUsesShell(t *testing.T) {
 }
 
 func TestStatusPrefixes(t *testing.T) {
-	if !strings.HasPrefix(statusLine(statusOK, "done"), "OK:") && !strings.Contains(statusLine(statusOK, "done"), "OK:") {
-		// lipgloss may wrap ANSI; check raw helper path without styles by kind mapping
+	ok := statusLine(statusOK, "done")
+	if !strings.Contains(ok, "OK:") || !strings.Contains(ok, "done") {
+		t.Fatalf("unexpected OK status: %q", ok)
 	}
 	s := statusLine(statusError, "boom")
-	if !strings.Contains(s, "Error:") && !strings.Contains(s, "boom") {
+	if !strings.Contains(s, "Error:") || !strings.Contains(s, "boom") {
 		t.Fatalf("unexpected status: %q", s)
 	}
 }
