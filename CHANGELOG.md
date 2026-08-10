@@ -33,10 +33,17 @@ First public release.
 
 ### Changed
 
+- TUI codebase split into `model.go` and per-view files for easier maintenance
 - TUI navigation: full-bleed shell, sticky footer, `Esc` one level back, `q` quit on main menu only
 - Users list paging, adaptive columns, scroll window, textual status prefixes (`OK:` / `Error:` / `Warn:` / `Loading:`)
 - Default user search filters cover `inetOrgPerson` **or** `posixAccount`
 - Docs and screenshots aligned with 0.2.0 menu layout and labeled keys
+
+### Fixed
+
+- Group edit no longer panics when `group_posix.yaml` is missing; create shows a clear error instead
+- `ldash config init` adds missing embedded templates even when `config.yaml` already exists (existing files are not overwritten)
+- `Esc` / back works consistently on all TUI screens, including group members, Samba user, LDIF steps, and search overlays
 
 ### Security
 
@@ -55,4 +62,4 @@ First public release.
 - Comprehensive `.gitignore` and `make setup-local` for gitignored maintainer docs
 - Documentation: installation, configuration, integration, Samba notes
 
-[0.2.0]: https://github.com/knieberg/ldash/compare/v0.0.1...v0.2.0
+[0.2.0]: https://github.com/knieberg/ldash/releases/tag/v0.2.0
