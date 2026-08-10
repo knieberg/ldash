@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Main menu navigation and user management TUI (list, search, create, edit, delete)
+- TUI app shell (header / content panel / sticky footer), help overlay (`?`), and English [TUI guide](docs/tui.md) with generic screenshots
+- Predictable navigation: `Esc` one level back, `q` quit on main menu only, menu number shortcuts, disabled Groups/Samba entries
+- Users list paging (`PgUp`/`PgDn`, Home/End), adaptive columns, scroll window, and status prefixes (`OK` / `Error` / `Warn` / `Loading`)
 - Admin password reset and mail attribute management
 - User template copy on `ldash config init`
 - Samba SID generation from `samba.domain_sid` and uidNumber
@@ -19,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- TUI layout and navigation: full-bleed shell, sticky footer, Esc/q separation, help overlay
 - Stronger `.gitignore` for editor/AI metadata; lean contribution checklist
 - Default user search filters cover `inetOrgPerson` **or** `posixAccount` (Samba-friendly)
 - Docs: schema matching, `ldapsearch` objectClass diagnosis, alternate Samba account template example

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="420" viewBox="0 0 720 420" role="img" aria-label="ldash main menu mockup">
+  <title>ldash main menu</title>
+  <rect width="720" height="420" rx="8" fill="#020617"/>
+  <rect x="1" y="1" width="718" height="418" rx="8" fill="none" stroke="#334155" stroke-width="2"/>
+  <text x="24" y="36" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="16" font-weight="700" fill="#60A5FA">ldash - LDAP Admin Shell</text>
+  <text x="24" y="58" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" font-weight="700" fill="#67E8F9">Main Menu</text>
+  <line x1="24" y1="72" x2="696" y2="72" stroke="#475569" stroke-width="1"/>
+  <rect x="24" y="92" width="672" height="260" rx="8" fill="#0F172A" stroke="#475569"/>
+  <text x="40" y="118" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" font-weight="700" fill="#67E8F9">Navigate</text>
+  <rect x="40" y="136" width="640" height="22" fill="#1E3A5F"/>
+  <text x="48" y="151" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#FEF08A">&gt; 1  Dashboard           Connection health</text>
+  <text x="48" y="175" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#E2E8F0">  2  Users                List, create, edit, delete</text>
+  <text x="48" y="199" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#94A3B8">  3  Groups               Coming in v0.2</text>
+  <text x="48" y="223" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#94A3B8">  4  Samba                Coming soon</text>
+  <text x="48" y="247" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#E2E8F0">  5  Integration Guide    Runtime snippets from local config</text>
+  <text x="48" y="271" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="13" fill="#E2E8F0">  6  Settings             Shows loaded connection profile</text>
+  <text x="40" y="310" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#94A3B8">Disabled items show a warning and stay on this menu.</text>
+  <rect x="24" y="372" width="672" height="28" fill="#1E293B"/>
+  <text x="36" y="390" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#94A3B8">j/k | 1-6 | Enter | ? | q quit</text>
+  <text x="500" y="390" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="12" fill="#94A3B8">Select a view...</text>
+</svg>
