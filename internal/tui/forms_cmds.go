@@ -261,20 +261,3 @@ func (m model) deleteGroupCmd() tea.Cmd {
 		return actionDoneMsg{message: fmt.Sprintf("Deleted group %s", cn), reloadView: viewGroups}
 	}
 }
-
-func (m model) loadGroupMembersCmd() tea.Cmd {
-	cn := m.formUID
-	client := m.client
-	return func() tea.Msg {
-		g, err := client.GetGroup(cn)
-		if err != nil {
-			return actionDoneMsg{err: err}
-		}
-		return groupMembersLoadedMsg{members: g.Members, memberAttr: g.MemberAttribute}
-	}
-}
-
-type groupMembersLoadedMsg struct {
-	members    []string
-	memberAttr string
-}

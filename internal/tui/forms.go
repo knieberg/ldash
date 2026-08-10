@@ -10,6 +10,31 @@ import (
 	ldapclient "github.com/knieberg/ldash/internal/ldap"
 )
 
+func newInput(placeholder string, password bool, width int) textinput.Model {
+	ti := textinput.New()
+	ti.Placeholder = placeholder
+	ti.CharLimit = 128
+	if width < 20 {
+		width = 40
+	}
+	ti.Width = width
+	if password {
+		ti.EchoMode = textinput.EchoPassword
+		ti.EchoCharacter = '•'
+	}
+	return ti
+}
+
+func (m *model) initCreateForm() {
+	tpl, err := config.LoadUserTemplate(m.cfg)
+	if err != nil {
+		m.formSpecs = nil
+		m.setStatus(statusError, err.Error())
+		return
+	}
+	m.initTemplateCreateForm(tpl)
+}
+
 func (m *model) initTemplateCreateForm(tpl *config.UserTemplate) {
 	m.formSpecs = tpl.AllFormFields(true)
 	m.formTemplateName = tpl.Name
