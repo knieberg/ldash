@@ -52,20 +52,23 @@ func newConfigCmd() *cobra.Command {
 		Use:   "init",
 		Short: "Initialize user config from config.example.yaml",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			example, err := findExampleConfig()
+			dest, err := config.InitFromEmbedded()
 			if err != nil {
-				return err
-			}
-			tplExample, err := findExampleTemplate()
-			if err != nil {
-				return err
-			}
-			dest, err := config.InitFromExample(example, tplExample)
-			if err != nil {
-				return err
+				example, err2 := findExampleConfig()
+				if err2 != nil {
+					return err
+				}
+				tplExample, err3 := findExampleTemplate()
+				if err3 != nil {
+					return err
+				}
+				dest, err = config.InitFromExample(example, tplExample)
+				if err != nil {
+					return err
+				}
 			}
 			fmt.Printf("Created config at %s\n", dest)
-			fmt.Println("User template: ~/.config/ldash/templates/user_samba_posix.yaml")
+			fmt.Println("Templates: ~/.config/ldash/templates/")
 			fmt.Println("Edit the files, then run: ldash")
 			return nil
 		},

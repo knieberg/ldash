@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/knieberg/ldash/internal/config"
+	ldifpkg "github.com/knieberg/ldash/internal/ldif"
 	ldapclient "github.com/knieberg/ldash/internal/ldap"
 )
 
@@ -28,6 +29,14 @@ const (
 	viewUserDelete
 	viewUserPassword
 	viewUserMail
+	viewLDIF
+	viewGroupCreate
+	viewGroupEdit
+	viewGroupDelete
+	viewGroupMembers
+	viewGroupMemberAdd
+	viewSambaUser
+	viewSambaFlags
 )
 
 type pingMsg struct {
@@ -41,9 +50,9 @@ type usersLoadedMsg struct {
 }
 
 type actionDoneMsg struct {
-	message string
-	err     error
-	reload  bool
+	message    string
+	err        error
+	reloadView viewID
 }
 
 type groupsLoadedMsg struct {
@@ -91,6 +100,34 @@ type model struct {
 	formDN     string
 	confirm    bool
 	groups     []ldapclient.GroupRef
+
+	groupsFull       []ldapclient.Group
+	groupCursor      int
+	groupFilter      string
+	groupSearching   bool
+	groupSearchInput textinput.Model
+	groupScrollOffset int
+	memberAttr       string
+	members          []string
+	memberCursor     int
+	formGID          int
+
+	formSpecs        []config.FormFieldSpec
+	formTemplateName string
+	formTemplateDesc string
+
+	ldifStep         int
+	ldifAction       string
+	ldifScopeIdx     int
+	ldifCursor       int
+	ldifPath         string
+	ldifPathInput    textinput.Model
+	ldifPreview      int
+	ldifResult       *ldifpkg.ApplyResult
+	ldifExportCount  int
+
+	sambaUser        *ldapclient.User
+	sambaNTPresent   bool
 }
 
 func New(cfg *config.Config, password string, integ *config.Integration) tea.Model {
@@ -98,26 +135,36 @@ func New(cfg *config.Config, password string, integ *config.Integration) tea.Mod
 		integ = &config.Integration{}
 	}
 	si := textinput.New()
-	si.Placeholder = "filter users..."
+	si.Placeholder = "filter..."
 	si.CharLimit = 64
 	si.Width = 40
+	gsi := textinput.New()
+	gsi.Placeholder = "filter groups..."
+	gsi.CharLimit = 64
+	gsi.Width = 40
+	lpi := textinput.New()
+	lpi.CharLimit = 256
+	lpi.Width = 60
 
 	return model{
-		cfg:         cfg,
-		integ:       integ,
-		password:    password,
-		client:      ldapclient.NewClient(cfg),
-		current:     viewMenu,
-		status:      "Select a view and press Enter",
-		statusK:     statusInfo,
-		searchInput: si,
+		cfg:              cfg,
+		integ:            integ,
+		password:         password,
+		client:           ldapclient.NewClient(cfg),
+		current:          viewMenu,
+		status:           "Select a view and press Enter",
+		statusK:          statusInfo,
+		searchInput:      si,
+		groupSearchInput: gsi,
+		ldifPathInput:    lpi,
 		menuItems: []menuItem{
 			{viewDashboard, "Dashboard", "Connection health", true},
 			{viewUsers, "Users", "List, create, edit, delete", true},
-			{viewGroups, "Groups", "Coming in v0.2", false},
-			{viewSamba, "Samba", "Coming soon", false},
+			{viewGroups, "Groups", "List, create, edit, members", true},
+			{viewLDIF, "LDIF", "Export and import backup", true},
+			{viewSamba, "Samba", "Samba attribute status", true},
 			{viewIntegration, "Integration Guide", "Runtime snippets from local config", true},
-			{viewSettings, "Settings", "Shows loaded connection profile", true},
+			{viewSettings, "Settings", "Connection profile and templates", true},
 		},
 	}
 }
@@ -179,20 +226,113 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case groupsLoadedFullMsg:
+		m.busy = false
+		if msg.err != nil {
+			m.setStatus(statusError, msg.err.Error())
+			m.groupsFull = nil
+		} else {
+			m.groupsFull = msg.groups
+			if m.groupCursor >= len(m.groupsFull) {
+				m.groupCursor = 0
+			}
+			m.ensureGroupVisible()
+			m.setStatus(statusInfo, fmt.Sprintf("%d group(s)", len(m.groupsFull)))
+		}
+		return m, nil
+
+	case ldifPreviewMsg:
+		m.busy = false
+		if msg.err != nil {
+			m.setStatus(statusError, msg.err.Error())
+		} else {
+			m.ldifPreview = msg.count
+			m.ldifStep = ldifStepConfirm
+			m.confirm = false
+			m.setStatus(statusInfo, fmt.Sprintf("%d entries in file", msg.count))
+		}
+		return m, nil
+
+	case ldifDoneMsg:
+		m.busy = false
+		if msg.err != nil {
+			m.setStatus(statusError, msg.err.Error())
+		} else {
+			m.ldifResult = msg.result
+			m.ldifExportCount = msg.count
+			m.ldifStep = ldifStepSummary
+			if msg.result != nil {
+				m.setStatus(statusOK, fmt.Sprintf("Applied %d, skipped %d", msg.result.Applied, msg.result.Skipped))
+			} else {
+				m.setStatus(statusOK, fmt.Sprintf("Exported %d entries", msg.count))
+			}
+		}
+		return m, nil
+
+	case sambaStatusMsg:
+		m.busy = false
+		if msg.err != nil {
+			m.setStatus(statusError, msg.err.Error())
+		} else {
+			m.sambaNTPresent = msg.present
+			m.setStatus(statusInfo, "Samba status loaded")
+		}
+		return m, nil
+
+	case sambaUserReloadMsg:
+		m.busy = false
+		if msg.err != nil {
+			m.setStatus(statusError, msg.err.Error())
+		} else {
+			u := msg.user
+			m.sambaUser = &u
+			m.sambaNTPresent = msg.present
+			m.setStatus(statusInfo, "Samba status loaded")
+		}
+		return m, nil
+
 	case actionDoneMsg:
 		m.busy = false
 		if msg.err != nil {
 			m.setStatus(statusError, msg.err.Error())
 		} else {
 			m.setStatus(statusOK, msg.message)
-			if msg.reload {
+			m.confirm = false
+			switch msg.reloadView {
+			case viewUsers:
 				m.current = viewUsers
-				m.confirm = false
 				m.busy = true
 				m.setStatus(statusLoading, "Refreshing users...")
 				return m, m.loadUsersCmd()
+			case viewGroups:
+				m.current = viewGroups
+				m.busy = true
+				m.setStatus(statusLoading, "Refreshing groups...")
+				return m, m.ensureConnAnd(m.loadGroupsFullCmd())
+			case viewGroupMembers:
+				m.busy = true
+				m.setStatus(statusLoading, "Refreshing members...")
+				return m, m.ensureConnAnd(m.loadGroupMembersCmd())
+			case viewSambaUser:
+				m.current = viewSambaUser
+				if m.sambaUser != nil {
+					m.busy = true
+					return m, m.ensureConnAnd(m.reloadSambaUserCmd())
+				}
 			}
 		}
+		return m, nil
+
+	case groupMembersLoadedMsg:
+		m.busy = false
+		m.members = msg.members
+		if msg.memberAttr != "" {
+			m.memberAttr = msg.memberAttr
+		}
+		if m.memberCursor >= len(m.members) {
+			m.memberCursor = 0
+		}
+		m.setStatus(statusInfo, fmt.Sprintf("%d member(s)", len(m.members)))
 		return m, nil
 
 	case tea.KeyMsg:
@@ -209,11 +349,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.searching && m.current == viewUsers {
 			return m.updateUserSearch(msg)
 		}
+		if m.groupSearching && m.current == viewGroups {
+			return m.updateGroupSearch(msg)
+		}
+		if m.ldifStep == ldifStepPath && m.current == viewLDIF {
+			return m.updateLDIFPath(msg)
+		}
 		if m.isFormView() {
 			return m.updateForm(msg)
 		}
-		if m.current == viewUserDelete {
+		if m.current == viewUserDelete || m.current == viewGroupDelete {
 			return m.updateDelete(msg)
+		}
+		if m.current == viewLDIF && m.ldifStep == ldifStepConfirm {
+			return m.updateLDIFConfirm(msg)
+		}
+		if m.current == viewGroupMembers {
+			return m.updateGroupMembers(msg)
+		}
+		if m.current == viewGroupMemberAdd {
+			return m.updateGroupMemberAdd(msg)
+		}
+		if m.current == viewSambaUser {
+			return m.updateSambaUser(msg)
 		}
 		return m.updateNav(msg)
 	}
@@ -222,11 +380,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) isFormView() bool {
 	return m.current == viewUserCreate || m.current == viewUserEdit ||
-		m.current == viewUserPassword || m.current == viewUserMail
+		m.current == viewUserPassword || m.current == viewUserMail ||
+		m.current == viewGroupCreate || m.current == viewGroupEdit ||
+		m.current == viewSambaFlags || m.current == viewGroupMemberAdd
 }
 
 func (m model) isUserChild() bool {
-	return m.isFormView() || m.current == viewUserDelete
+	return m.isFormView() || m.current == viewUserDelete || m.current == viewSambaUser
+}
+
+func (m model) isGroupChild() bool {
+	return m.current == viewGroupCreate || m.current == viewGroupEdit ||
+		m.current == viewGroupDelete || m.current == viewGroupMembers ||
+		m.current == viewGroupMemberAdd
 }
 
 func (m model) quit() (tea.Model, tea.Cmd) {
@@ -245,10 +411,50 @@ func (m model) goBack() (tea.Model, tea.Cmd) {
 		m.searchInput.Blur()
 		return m, nil
 	}
+	if m.groupSearching && m.current == viewGroups {
+		m.groupSearching = false
+		m.groupSearchInput.Blur()
+		return m, nil
+	}
+	if m.current == viewSambaFlags {
+		m.current = viewSambaUser
+		m.setStatus(statusInfo, "Cancelled")
+		return m, nil
+	}
 	if m.isUserChild() {
 		m.current = viewUsers
 		m.confirm = false
 		m.setStatus(statusInfo, "Cancelled")
+		return m, nil
+	}
+	if m.isGroupChild() {
+		if m.current == viewGroupMemberAdd {
+			m.current = viewGroupMembers
+			return m, nil
+		}
+		if m.current == viewGroupMembers {
+			m.current = viewGroups
+			return m, nil
+		}
+		m.current = viewGroups
+		m.confirm = false
+		m.setStatus(statusInfo, "Cancelled")
+		return m, nil
+	}
+	if m.current == viewLDIF {
+		switch m.ldifStep {
+		case ldifStepSummary, ldifStepConfirm:
+			m.ldifStep = ldifStepHub
+			m.confirm = false
+			return m, nil
+		case ldifStepPath:
+			m.ldifStep = ldifStepHub
+			m.ldifPathInput.Blur()
+			return m, nil
+		}
+	}
+	if m.current == viewSambaUser {
+		m.current = viewUsers
 		return m, nil
 	}
 	if m.current != viewMenu {
@@ -288,6 +494,10 @@ func (m model) updateNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case viewUsers:
 		return m.updateUsersList(msg)
+	case viewGroups:
+		return m.updateGroupsList(msg)
+	case viewLDIF:
+		return m.updateLDIF(msg)
 	}
 	return m, nil
 }
@@ -330,6 +540,15 @@ func (m model) openMenuItem(idx int) (tea.Model, tea.Cmd) {
 		m.busy = true
 		m.setStatus(statusLoading, "Loading users...")
 		return m, m.ensureConnAnd(m.loadUsersCmd())
+	}
+	if item.id == viewGroups {
+		m.busy = true
+		m.setStatus(statusLoading, "Loading groups...")
+		return m, m.ensureConnAnd(m.loadGroupsFullCmd())
+	}
+	if item.id == viewLDIF {
+		m.ldifStep = ldifStepHub
+		m.ldifCursor = 0
 	}
 	return m, nil
 }
@@ -409,6 +628,14 @@ func (m model) updateUsersList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.current = viewUserMail
 			return m, textinput.Blink
 		}
+	case keySamba:
+		if u := m.selectedUser(); u != nil {
+			m.sambaUser = u
+			m.current = viewSambaUser
+			m.busy = true
+			m.setStatus(statusLoading, "Loading Samba status...")
+			return m, m.ensureConnAnd(m.loadSambaStatusCmd(u.DN))
+		}
 	}
 	return m, nil
 }
@@ -478,6 +705,10 @@ func (m model) updateDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.busy = true
+		if m.current == viewGroupDelete {
+			m.setStatus(statusLoading, "Deleting group...")
+			return m, m.ensureConnAnd(m.deleteGroupCmd())
+		}
 		m.setStatus(statusLoading, "Deleting user...")
 		return m, m.ensureConnAnd(m.deleteUserCmd())
 	}
@@ -574,19 +805,34 @@ func (m model) viewBody() string {
 	case viewUsers:
 		content = m.viewUsers()
 	case viewGroups:
-		content = mutedStyle.Render("Group membership management is planned for v0.2.") +
-			"\n" + mutedStyle.Render("Press Esc to return to the main menu.")
+		content = m.viewGroupsList()
 	case viewSamba:
-		content = mutedStyle.Render("Samba status view is planned for a later release.") +
-			"\n" + mutedStyle.Render("Press Esc to return to the main menu.")
+		content = m.viewSambaHub()
+	case viewLDIF:
+		content = m.viewLDIF()
 	case viewIntegration:
 		content = m.viewIntegration()
 	case viewSettings:
 		content = m.viewSettings()
-	case viewUserCreate, viewUserEdit, viewUserPassword, viewUserMail:
-		content = m.viewForm()
-	case viewUserDelete:
+	case viewUserCreate, viewUserEdit, viewGroupCreate, viewGroupEdit, viewSambaFlags:
+		titles := map[viewID]string{
+			viewUserCreate:  "Create user",
+			viewUserEdit:    "Edit user " + m.formUID,
+			viewGroupCreate: "Create group",
+			viewGroupEdit:   "Edit group " + m.formUID,
+			viewSambaFlags:  "Edit Samba flags for " + m.formUID,
+		}
+		content = m.viewTemplateForm(titles[m.current])
+	case viewUserPassword, viewUserMail:
+		content = m.viewSimpleForm()
+	case viewUserDelete, viewGroupDelete:
 		content = m.viewDelete()
+	case viewGroupMembers:
+		content = m.viewGroupMembers()
+	case viewGroupMemberAdd:
+		content = m.viewMemberAddForm()
+	case viewSambaUser:
+		content = m.viewSambaUser()
 	default:
 		content = ""
 	}
@@ -613,7 +859,7 @@ func (m model) helpContent() string {
 	b.WriteString("  q       quit (main menu only)\n")
 	b.WriteString("  Ctrl+C  quit anytime\n")
 	b.WriteString("  ?       toggle this help\n")
-	b.WriteString("  1-6     open main menu item\n")
+	b.WriteString("  1-7     open main menu item\n")
 	b.WriteString("\n")
 	b.WriteString(headerStyle.Render("This view"))
 	b.WriteString("\n")
@@ -628,20 +874,42 @@ func (m model) helpContent() string {
 func (m model) helpViewKeys() string {
 	switch m.current {
 	case viewMenu:
-		return "j/k move · Enter open · disabled items stay on menu"
+		return helpLines([]keyAction{{keyUp + "/" + keyDown, "move"}, {"1-7", "open"}, {keyEnter, "open"}})
 	case viewDashboard:
-		return "r test LDAP connection"
+		return helpLines([]keyAction{{keyRefresh, "test connection"}})
 	case viewUsers:
 		if m.searching {
-			return "Enter apply · Esc cancel · Ctrl+U clear filter text"
+			return helpLines([]keyAction{{keyEnter, "apply filter"}, {keyBack, "cancel"}, {"Ctrl+U", "clear text"}})
 		}
-		return "j/k move · PgUp/PgDn page · g/G or Home/End · / search · c e d p m · r refresh"
-	case viewUserCreate, viewUserEdit, viewUserPassword, viewUserMail:
-		return "Tab next field · Enter submit · Esc cancel"
-	case viewUserDelete:
-		return "y confirm (twice) · n or Esc cancel"
+		return helpLines([]keyAction{
+			{keyUp + "/" + keyDown, "move"}, {"PgUp/PgDn", "page"}, {"g/G", "first/last"},
+			{keySearch, "search"}, {keyCreate, "create"}, {keyEdit, "edit"}, {keyDelete, "delete"},
+			{keyPassword, "password"}, {keyMail, "mail"}, {keySamba, "samba"}, {keyRefresh, "refresh"},
+		})
+	case viewGroups:
+		if m.groupSearching {
+			return helpLines([]keyAction{{keyEnter, "apply filter"}, {keyBack, "cancel"}})
+		}
+		return helpLines([]keyAction{
+			{keyUp + "/" + keyDown, "move"}, {keySearch, "search"}, {keyCreate, "create"},
+			{keyEdit, "edit"}, {keyDelete, "delete"}, {keyMembers, "members"}, {keyRefresh, "refresh"},
+		})
+	case viewLDIF:
+		return helpLines([]keyAction{{keyUp + "/" + keyDown, "move"}, {keyEnter, "open"}, {keyBack, "back"}})
+	case viewSamba:
+		return helpLines([]keyAction{{keyBack, "back"}})
+	case viewSambaUser:
+		return helpLines([]keyAction{{keyEdit, "edit flags"}, {keyBack, "back"}})
+	case viewUserCreate, viewUserEdit, viewGroupCreate, viewGroupEdit, viewSambaFlags:
+		return helpLines([]keyAction{{"Tab", "next field"}, {keyEnter, "submit"}, {keyBack, "cancel"}})
+	case viewUserPassword, viewUserMail, viewGroupMemberAdd:
+		return helpLines([]keyAction{{keyEnter, "submit"}, {keyBack, "cancel"}})
+	case viewUserDelete, viewGroupDelete:
+		return helpLines([]keyAction{{"y", "confirm (twice)"}, {"n", "cancel"}})
+	case viewGroupMembers:
+		return helpLines([]keyAction{{keyCreate, "add member"}, {keyDelete, "remove"}, {keyUp + "/" + keyDown, "move"}})
 	default:
-		return "Esc back"
+		return helpLines([]keyAction{{keyBack, "back"}})
 	}
 }
 
@@ -681,8 +949,24 @@ func (m model) breadcrumbParts() []string {
 		return []string{"Main Menu", "Users", "Mail"}
 	case viewGroups:
 		return []string{"Main Menu", "Groups"}
+	case viewGroupCreate:
+		return []string{"Main Menu", "Groups", "Create"}
+	case viewGroupEdit:
+		return []string{"Main Menu", "Groups", "Edit"}
+	case viewGroupDelete:
+		return []string{"Main Menu", "Groups", "Delete"}
+	case viewGroupMembers:
+		return []string{"Main Menu", "Groups", "Members"}
+	case viewGroupMemberAdd:
+		return []string{"Main Menu", "Groups", "Members", "Add"}
+	case viewLDIF:
+		return []string{"Main Menu", "LDIF"}
 	case viewSamba:
 		return []string{"Main Menu", "Samba"}
+	case viewSambaUser:
+		return []string{"Main Menu", "Users", "Samba"}
+	case viewSambaFlags:
+		return []string{"Main Menu", "Users", "Samba", "Flags"}
 	case viewIntegration:
 		return []string{"Main Menu", "Integration Guide"}
 	case viewSettings:
@@ -693,31 +977,54 @@ func (m model) breadcrumbParts() []string {
 }
 
 func (m model) footerKeys() string {
-	base := ""
+	if m.busy {
+		return joinHints([]keyAction{{keyHelp, "help"}}, 0)
+	}
 	switch m.current {
 	case viewMenu:
-		base = "j/k · 1-6 · Enter · ? · q quit"
+		return footerMenu()
 	case viewDashboard:
-		base = "r test · Esc back · ?"
+		return joinHints([]keyAction{{keyRefresh, "test"}, {keyBack, "back"}, {keyHelp, "help"}}, 0)
 	case viewUsers:
 		if m.searching {
-			base = "Enter apply · Esc cancel · Ctrl+U clear · ?"
-		} else if m.userFilter != "" {
-			base = "j/k · PgUp/PgDn · / search · c e d p m · r · Esc back · ? (filter on)"
-		} else {
-			base = "j/k · PgUp/PgDn · / · c e d p m · r · Esc back · ?"
+			return joinHints([]keyAction{{keyEnter, "apply"}, {keyBack, "cancel"}, {keyHelp, "help"}}, 0)
 		}
-	case viewUserCreate, viewUserEdit, viewUserPassword, viewUserMail:
-		base = "Tab · Enter submit · Esc cancel · ?"
-	case viewUserDelete:
-		base = "y confirm · n/Esc cancel · ?"
-	default:
-		base = "Esc back · ?"
+		return footerUsersList(m.userFilter != "")
+	case viewGroups:
+		if m.groupSearching {
+			return joinHints([]keyAction{{keyEnter, "apply"}, {keyBack, "cancel"}, {keyHelp, "help"}}, 0)
+		}
+		return footerGroupsList()
+	case viewLDIF:
+		switch m.ldifStep {
+		case ldifStepHub:
+			return footerLDIFHub()
+		case ldifStepPath:
+			return joinHints([]keyAction{{keyEnter, "submit"}, {keyBack, "back"}, {keyHelp, "help"}}, 0)
+		case ldifStepConfirm:
+			return footerDeleteConfirm()
+		case ldifStepSummary:
+			return joinHints([]keyAction{{keyBack, "back"}, {keyHelp, "help"}}, 0)
+		}
+	case viewSamba:
+		return joinHints([]keyAction{{keyBack, "back"}, {keyHelp, "help"}}, 0)
+	case viewSambaUser:
+		return joinHints([]keyAction{{keyEdit, "edit flags"}, {keyBack, "back"}, {keyHelp, "help"}}, 0)
+	case viewUserCreate, viewUserEdit, viewGroupCreate, viewGroupEdit, viewSambaFlags:
+		return footerForm()
+	case viewUserPassword, viewUserMail, viewGroupMemberAdd:
+		return footerForm()
+	case viewUserDelete, viewGroupDelete:
+		return footerDeleteConfirm()
+	case viewGroupMembers:
+		return joinHints([]keyAction{
+			{keyCreate, "add"}, {keyDelete, "remove"}, {keyUp + "/" + keyDown, "move"},
+			{keyBack, "back"}, {keyHelp, "help"},
+		}, 0)
+	case viewIntegration, viewSettings:
+		return joinHints(footerCommonBackHelp(), 0)
 	}
-	if m.busy {
-		return base
-	}
-	return base
+	return joinHints(footerCommonBackHelp(), 0)
 }
 
 func (m model) viewMenu() string {
@@ -752,7 +1059,7 @@ func (m model) viewMenu() string {
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
-	b.WriteString(mutedStyle.Render("Disabled items show a warning and stay on this menu."))
+	b.WriteString(mutedStyle.Render("Press number keys 1–7 or Enter to open a view."))
 	return b.String()
 }
 
@@ -821,7 +1128,7 @@ func (m model) viewUsers() string {
 	if len(m.users) == 0 {
 		b.WriteString(mutedStyle.Render("No users found."))
 		b.WriteString("\n")
-		b.WriteString(mutedStyle.Render("Press r to refresh · c to create · / to change filter."))
+		b.WriteString(mutedStyle.Render("Press r refresh · c create · / search"))
 		b.WriteString("\n")
 		b.WriteString(warnStyle.Render("Warn: Check search.list_users_filter — does it match your LDAP object classes?"))
 		return b.String()
@@ -914,21 +1221,38 @@ func (m model) viewSettings() string {
 	if inner < 20 {
 		inner = 20
 	}
+	userTpl, userErr := config.LoadUserTemplate(m.cfg)
+	groupTpl, groupErr := config.LoadGroupTemplate(m.cfg)
+	userLine := "not loaded"
+	if userErr == nil && userTpl != nil {
+		userLine = userTpl.Name
+	} else if userErr != nil {
+		userLine = userErr.Error()
+	}
+	groupLine := "not loaded"
+	if groupErr == nil && groupTpl != nil {
+		groupLine = groupTpl.Name
+	} else if groupErr != nil {
+		groupLine = groupErr.Error()
+	}
+	integLine := "absent"
+	if _, err := config.LoadIntegration(); err == nil {
+		integLine = "present (optional hints)"
+	}
 	return boxStyle.Width(inner).Render(strings.Join([]string{
-		"Config profile: single file (MVP)",
 		fmt.Sprintf("Server: %s", m.cfg.Server.URL),
 		fmt.Sprintf("TLS mode: %s", m.cfg.Server.TLSMode),
 		fmt.Sprintf("Bind DN: %s", m.cfg.BindDN),
 		fmt.Sprintf("Samba domain SID set: %v", m.cfg.Samba.DomainSID != ""),
-		fmt.Sprintf("Templates dir: %s", m.cfg.TemplatesDir),
+		fmt.Sprintf("User template: %s", userLine),
+		fmt.Sprintf("Group template: %s", groupLine),
+		fmt.Sprintf("Integration file: %s", integLine),
 	}, "\n"))
 }
 
-func (m model) viewForm() string {
+func (m model) viewSimpleForm() string {
 	var b strings.Builder
 	titles := map[viewID]string{
-		viewUserCreate:   "Create user",
-		viewUserEdit:     "Edit user " + m.formUID,
 		viewUserPassword: "Reset password for " + m.formUID,
 		viewUserMail:     "Mail for " + m.formUID,
 	}
@@ -951,19 +1275,27 @@ func (m model) viewForm() string {
 
 func (m model) viewDelete() string {
 	var b strings.Builder
-	b.WriteString(warnStyle.Render(fmt.Sprintf("Delete user %q?", m.formUID)))
-	b.WriteString("\n")
-	b.WriteString(mutedStyle.Render(m.formDN))
-	b.WriteString("\n\n")
-	if len(m.groups) > 0 {
-		b.WriteString("Referenced by groups:\n")
-		for _, g := range m.groups {
-			fmt.Fprintf(&b, "  - %s (%s)\n", g.CN, g.Attr)
-		}
+	if m.current == viewGroupDelete {
+		b.WriteString(warnStyle.Render(fmt.Sprintf("Delete group %q?", m.formUID)))
 		b.WriteString("\n")
-	} else {
-		b.WriteString(mutedStyle.Render("No group memberships found (or still loading)."))
+		b.WriteString(mutedStyle.Render(m.formDN))
 		b.WriteString("\n\n")
+		b.WriteString(mutedStyle.Render("Deletion is blocked if users still have this gidNumber as primary group."))
+	} else {
+		b.WriteString(warnStyle.Render(fmt.Sprintf("Delete user %q?", m.formUID)))
+		b.WriteString("\n")
+		b.WriteString(mutedStyle.Render(m.formDN))
+		b.WriteString("\n\n")
+		if len(m.groups) > 0 {
+			b.WriteString("Referenced by groups:\n")
+			for _, g := range m.groups {
+				fmt.Fprintf(&b, "  - %s (%s)\n", g.CN, g.Attr)
+			}
+			b.WriteString("\n")
+		} else {
+			b.WriteString(mutedStyle.Render("No group memberships found (or still loading)."))
+			b.WriteString("\n\n")
+		}
 	}
 	if m.confirm {
 		b.WriteString(errStyle.Render("Final confirmation: press y to permanently delete."))
@@ -1004,31 +1336,32 @@ func newInput(placeholder string, password bool, width int) textinput.Model {
 }
 
 func (m *model) initCreateForm() {
-	w := formInputWidth(m.width)
-	m.formInputs = []textinput.Model{
-		newInput("alice", false, w),
-		newInput("Alice Example", false, w),
-		newInput("Example", false, w),
-		newInput("Alice", false, w),
-		newInput("alice@example.com", false, w),
-		newInput("initial password", true, w),
+	tpl, err := config.LoadUserTemplate(m.cfg)
+	if err != nil {
+		m.formSpecs = nil
+		m.setStatus(statusError, err.Error())
+		return
 	}
-	m.formFocus = 0
-	m.formInputs[0].Focus()
+	m.initTemplateCreateForm(tpl)
 }
 
 func (m *model) initEditForm(u ldapclient.User) {
-	w := formInputWidth(m.width)
 	m.formUID = u.UID
 	m.formDN = u.DN
-	vals := []string{u.CN, u.SN, u.GivenName, u.Mail, u.Gecos, u.LoginShell, u.HomeDirectory}
-	m.formInputs = make([]textinput.Model, len(vals))
-	for i, v := range vals {
-		m.formInputs[i] = newInput("", false, w)
-		m.formInputs[i].SetValue(v)
+	tpl, err := config.LoadUserTemplate(m.cfg)
+	if err != nil {
+		m.formSpecs = nil
+		return
 	}
-	m.formFocus = 0
-	m.formInputs[0].Focus()
+	extra := map[string]string{}
+	if m.client.Connected() {
+		if attrs := templateCustomAttrs(tpl); len(attrs) > 0 {
+			if got, err := m.client.GetEntryAttrs(u.DN, attrs); err == nil {
+				extra = got
+			}
+		}
+	}
+	m.initTemplateEditForm(tpl, u, extra)
 }
 
 func (m *model) initPasswordForm(u ldapclient.User) {
@@ -1060,6 +1393,12 @@ func (m model) submitForm() (tea.Model, tea.Cmd) {
 		return m, m.ensureConnAnd(m.passwordCmd())
 	case viewUserMail:
 		return m, m.ensureConnAnd(m.mailCmd())
+	case viewGroupCreate:
+		return m, m.ensureConnAnd(m.createGroupCmd())
+	case viewGroupEdit:
+		return m, m.ensureConnAnd(m.updateGroupCmd())
+	case viewSambaFlags:
+		return m, m.ensureConnAnd(m.sambaFlagsCmd())
 	}
 	return m, nil
 }
@@ -1106,59 +1445,6 @@ func (m model) loadGroupsCmd(uid, dn string) tea.Cmd {
 	}
 }
 
-func (m model) createUserCmd() tea.Cmd {
-	vals := make([]string, len(m.formInputs))
-	for i, in := range m.formInputs {
-		vals[i] = strings.TrimSpace(in.Value())
-	}
-	cfg := m.cfg
-	client := m.client
-	return func() tea.Msg {
-		tpl, err := config.LoadUserTemplate(cfg)
-		if err != nil {
-			return actionDoneMsg{err: err}
-		}
-		err = client.CreateUser(ldapclient.CreateUserInput{
-			UID:       vals[0],
-			CN:        vals[1],
-			SN:        vals[2],
-			GivenName: vals[3],
-			Mail:      vals[4],
-			Password:  vals[5],
-			Template:  tpl,
-		})
-		if err != nil {
-			return actionDoneMsg{err: err}
-		}
-		return actionDoneMsg{message: fmt.Sprintf("Created user %s", vals[0]), reload: true}
-	}
-}
-
-func (m model) updateUserCmd() tea.Cmd {
-	vals := make([]string, len(m.formInputs))
-	for i, in := range m.formInputs {
-		vals[i] = strings.TrimSpace(in.Value())
-	}
-	dn := m.formDN
-	client := m.client
-	return func() tea.Msg {
-		err := client.UpdateUser(ldapclient.UpdateUserInput{
-			DN:            dn,
-			CN:            vals[0],
-			SN:            vals[1],
-			GivenName:     vals[2],
-			Mail:          vals[3],
-			Gecos:         vals[4],
-			LoginShell:    vals[5],
-			HomeDirectory: vals[6],
-		})
-		if err != nil {
-			return actionDoneMsg{err: err}
-		}
-		return actionDoneMsg{message: "User updated", reload: true}
-	}
-}
-
 func (m model) passwordCmd() tea.Cmd {
 	pass := m.formInputs[0].Value()
 	dn := m.formDN
@@ -1170,7 +1456,7 @@ func (m model) passwordCmd() tea.Cmd {
 		if err := client.SetPassword(dn, pass); err != nil {
 			return actionDoneMsg{err: err}
 		}
-		return actionDoneMsg{message: "Password updated", reload: true}
+		return actionDoneMsg{message: "Password updated", reloadView: viewUsers}
 	}
 }
 
@@ -1186,19 +1472,7 @@ func (m model) mailCmd() tea.Cmd {
 		if mail == "" {
 			msg = "Mail attribute removed"
 		}
-		return actionDoneMsg{message: msg, reload: true}
-	}
-}
-
-func (m model) deleteUserCmd() tea.Cmd {
-	dn := m.formDN
-	uid := m.formUID
-	client := m.client
-	return func() tea.Msg {
-		if err := client.DeleteUser(dn); err != nil {
-			return actionDoneMsg{err: err}
-		}
-		return actionDoneMsg{message: fmt.Sprintf("Deleted user %s", uid), reload: true}
+		return actionDoneMsg{message: msg, reloadView: viewUsers}
 	}
 }
 

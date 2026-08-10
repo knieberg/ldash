@@ -59,16 +59,13 @@ func TestHelpClosesFirst(t *testing.T) {
 	}
 }
 
-func TestDisabledMenuDoesNotNavigate(t *testing.T) {
+func TestGroupsMenuNavigates(t *testing.T) {
 	m := testModel()
 	m.menuCursor = 2 // Groups
 	m2, _ := m.openMenuItem(2)
 	mm := m2.(model)
-	if mm.current != viewMenu {
-		t.Fatalf("disabled item opened view %v", mm.current)
-	}
-	if mm.statusK != statusWarn {
-		t.Fatalf("expected warn status, got %v", mm.statusK)
+	if mm.current != viewGroups {
+		t.Fatalf("groups item should open viewGroups, got %v", mm.current)
 	}
 }
 

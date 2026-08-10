@@ -103,6 +103,34 @@ func (c *Client) Connected() bool {
 	return c.bound && c.conn != nil
 }
 
+func (c *Client) RawSearch(req *ldap.SearchRequest) (*ldap.SearchResult, error) {
+	if err := c.requireBound(); err != nil {
+		return nil, err
+	}
+	return c.conn.Search(req)
+}
+
+func (c *Client) RawAdd(req *ldap.AddRequest) error {
+	if err := c.requireBound(); err != nil {
+		return err
+	}
+	return c.conn.Add(req)
+}
+
+func (c *Client) RawModify(req *ldap.ModifyRequest) error {
+	if err := c.requireBound(); err != nil {
+		return err
+	}
+	return c.conn.Modify(req)
+}
+
+func (c *Client) RawDel(req *ldap.DelRequest) error {
+	if err := c.requireBound(); err != nil {
+		return err
+	}
+	return c.conn.Del(req)
+}
+
 func (c *Client) Ping(bindPassword string) PingResult {
 	start := time.Now()
 	if err := c.Connect(bindPassword); err != nil {

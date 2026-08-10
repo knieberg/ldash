@@ -67,17 +67,6 @@ type Integration struct {
 	OnboardingChecklist []string `yaml:"onboarding_checklist"`
 }
 
-// UserTemplate describes object classes and defaults for user creation.
-type UserTemplate struct {
-	Name                string            `yaml:"name"`
-	Description         string            `yaml:"description"`
-	ObjectClasses       []string          `yaml:"object_classes"`
-	Defaults            map[string]string `yaml:"defaults"`
-	RequiredAttributes  []string          `yaml:"required_attributes"`
-	OptionalAttributes  []string          `yaml:"optional_attributes"`
-	CreatePrimaryGroup  bool              `yaml:"create_primary_group"`
-}
-
 func DefaultConfigDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -232,67 +221,6 @@ func LoadIntegration() (*Integration, error) {
 		return nil, fmt.Errorf("parse integration.yaml: %w", err)
 	}
 	return &integ, nil
-}
-
-func LoadUserTemplate(cfg *Config) (*UserTemplate, error) {
-	dir, err := cfg.ResolvedTemplatesDir()
-	if err != nil {
-		return nil, err
-	}
-	path := filepath.Join(dir, "user_samba_posix.yaml")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read user template %s: %w", path, err)
-	}
-	var tpl UserTemplate
-	if err := yaml.Unmarshal(data, &tpl); err != nil {
-		return nil, fmt.Errorf("parse user template: %w", err)
-	}
-	if len(tpl.ObjectClasses) == 0 {
-		return nil, fmt.Errorf("user template has no object_classes")
-	}
-	if tpl.Defaults == nil {
-		tpl.Defaults = map[string]string{}
-	}
-	return &tpl, nil
-}
-
-// InitFromExample copies the example config and user template into the user config directory.
-func InitFromExample(examplePath, templateExamplePath string) (string, error) {
-	cfgDir, err := DefaultConfigDir()
-	if err != nil {
-		return "", err
-	}
-	if err := os.MkdirAll(cfgDir, 0o700); err != nil {
-		return "", fmt.Errorf("create config dir: %w", err)
-	}
-	dest := filepath.Join(cfgDir, ConfigFile)
-	if _, err := os.Stat(dest); err == nil {
-		return dest, fmt.Errorf("config already exists at %s", dest)
-	}
-	data, err := os.ReadFile(examplePath)
-	if err != nil {
-		return "", fmt.Errorf("read example config: %w", err)
-	}
-	if err := os.WriteFile(dest, data, 0o600); err != nil {
-		return "", fmt.Errorf("write config: %w", err)
-	}
-	templatesDir, err := ExpandPath("~/.config/ldash/templates")
-	if err != nil {
-		return "", err
-	}
-	if err := os.MkdirAll(templatesDir, 0o700); err != nil {
-		return "", fmt.Errorf("create templates dir: %w", err)
-	}
-	if templateExamplePath != "" {
-		tplDest := filepath.Join(templatesDir, "user_samba_posix.yaml")
-		if _, err := os.Stat(tplDest); os.IsNotExist(err) {
-			if err := copyFile(templateExamplePath, tplDest, 0o600); err != nil {
-				return dest, fmt.Errorf("copy user template: %w", err)
-			}
-		}
-	}
-	return dest, nil
 }
 
 func copyFile(src, dst string, mode os.FileMode) error {

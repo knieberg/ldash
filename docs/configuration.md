@@ -87,24 +87,37 @@ When creating users with `sambaSamAccount`, ldash sets `sambaSID` as:
 
 Put your real domain SID only in `~/.config/ldash/config.yaml` — never in the repository.
 
-## User templates
+## User and group templates
 
-`ldash config init` copies `internal/templates/user_samba_posix.example.yaml` to:
+`ldash config init` writes embedded files to `~/.config/ldash/` (works from an installed binary, not only from a git checkout):
 
-```
-~/.config/ldash/templates/user_samba_posix.yaml
-```
+| Destination | Role |
+| --- | --- |
+| `config.yaml` | Active connection profile (from `config.example.yaml`) |
+| `templates/user_samba_posix.yaml` | **Active** user template (`LoadUserTemplate`) |
+| `templates/group_posix.yaml` | **Active** group template (`LoadGroupTemplate`) |
+| `templates/user_samba_account.example.yaml` | Reference copy |
+| `templates/group_of_names.example.yaml` | Reference copy |
 
-**Always adapt the template to your live schema.** Creating users with object classes that differ from existing entries leads to inconsistent directory data.
+`integration.yaml` is **not** created automatically.
 
-Shipped examples (generic only):
+**Always adapt templates to your live schema.** Create/edit forms render `required_attributes`, `optional_attributes`, and `custom_attributes` from the active YAML. Duplicate attribute names between built-in lists and `custom_attributes` fail at load time.
+
+Shipped user examples (generic only):
 
 | File | Typical use |
 | --- | --- |
 | `user_samba_posix.example.yaml` | `inetOrgPerson` + `posixAccount` + `sambaSamAccount` |
 | `user_samba_account.example.yaml` | `account` + `posixAccount` + `sambaSamAccount` (common Samba layout) |
 
-Copy the account-oriented example over your local template when existing users do not use `inetOrgPerson`.
+Group examples:
+
+| File | Typical use |
+| --- | --- |
+| `group_posix.example.yaml` | `posixGroup` with `memberUid` |
+| `group_of_names.example.yaml` | `groupOfNames` with `member` DN references |
+
+When `create_primary_group: true` on the user template, ldash creates the primary group using the **active group template** (object classes and member attribute).
 
 ## Integration hints (optional)
 

@@ -1,0 +1,18 @@
+# Reference template — groupOfNames with member DN (not active by default)
+name: group_of_names
+description: groupOfNames with member DN references (reference only)
+
+object_classes:
+  - groupOfNames
+
+member_attribute: member
+
+defaults: {}
+
+required_attributes:
+  - cn
+
+optional_attributes:
+  - description
+
+custom_attributes: []

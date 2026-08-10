@@ -37,7 +37,7 @@ These files are **never** committed.
 ldash config init
 ```
 
-This creates `~/.config/ldash/config.yaml` from the shipped example. Edit it with your server details.
+This creates `~/.config/ldash/config.yaml` and template files (user + group templates and reference copies) from embedded assets shipped with the binary.
 
 ```bash
 chmod 700 ~/.config/ldash
@@ -75,15 +75,17 @@ See the [Terminal UI guide](tui.md) for navigation, keys, and screenshots.
 | `~/.local/bin/ldash` | 0755 | User install binary |
 | `/usr/local/bin/ldash` | 0755 | System install binary |
 
-## Prebuilt binary (future)
+## Prebuilt binary
 
-When releases are available:
+When [GitHub releases](https://github.com/knieberg/ldash/releases) are available:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/knieberg/ldash/main/scripts/install.sh | bash
 ```
 
-Until then, use the build-from-source steps above.
+The installer defaults to `~/.local/bin`. Override with `LDASH_INSTALL_DIR` or pin a version with `LDASH_VERSION=v0.2.0`.
+
+Then run `ldash config init` (not automatic).
 
 ## Uninstall
 

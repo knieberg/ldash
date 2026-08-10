@@ -4,7 +4,7 @@
 
 | Version | Supported |
 | --- | --- |
-| latest release | yes |
+| 0.2.x | yes |
 | older releases | best effort |
 
 ## Reporting a vulnerability
@@ -33,3 +33,4 @@ We aim to acknowledge reports within a reasonable timeframe and will coordinate 
 - Prefer `starttls` or `ldaps`. Certificate hostname verification is enforced (no skip-verify).
 - `tls_mode: plain` is unencrypted and intended for local lab use only — not for production.
 - Password changes use the LDAP Password Modify extended operation only. ldash does not write plaintext `userPassword` attributes as a fallback.
+- LDIF export redacts `userPassword`, `sambaNTPassword`, and related hash attributes. LDIF import skips those attributes; set login secrets only via the Password Modify flow in the TUI.

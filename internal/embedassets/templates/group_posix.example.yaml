@@ -1,0 +1,23 @@
+# Group creation template — copy to ~/.config/ldash/templates/group_posix.yaml
+name: posix_group
+description: POSIX group with memberUid (example)
+
+object_classes:
+  - posixGroup
+
+member_attribute: memberUid
+
+defaults: {}
+
+required_attributes:
+  - cn
+  - gidNumber
+
+optional_attributes:
+  - description
+
+custom_attributes:
+  - name: telephoneNumber
+    label: Phone number
+    help: Optional contact phone (LDAP telephoneNumber)
+    required: false
